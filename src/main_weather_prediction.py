@@ -6,11 +6,11 @@ import logging
 import time
 from tqdm import tqdm # Added tqdm
 
-# Project modules
+# Project modules - notice the import paths use the alias structure
 from src import config
 from src.utils import file_handler
-from src.data_preprocessing import merge_data, preprocessing
-from src.weather_prediction import train, evaluate
+from src.dataPreprocessing.weatherPredictionProcessing import merge_data, preprocessing
+from src.weatherPrediction import train, evaluate
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
