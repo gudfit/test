@@ -4,9 +4,10 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import logging
 import time
-from tqdm import tqdm # Added tqdm
+from tqdm import tqdm
+import gc  # Add garbage collector
 
-# Project modules - notice the import paths use the alias structure
+# Project modules
 from src import config
 from src.utils import file_handler
 from src.dataPreprocessing.weatherPredictionProcessing import merge_data, preprocessing
@@ -23,26 +24,128 @@ def run_enhanced_feature_pipeline():
     logging.info("Loading and merging all file pairs...")
     all_merged_list = []
     file_pairs = zip(config.WEATHER_FILES, config.FLIGHT_FILES)
+    
     # Use tqdm for progress bar on file loading
     for weather_file, flight_file in tqdm(file_pairs, total=len(config.WEATHER_FILES), desc="Loading Data"):
         weather_fp = config.DATA_DIR / weather_file
         flight_fp = config.DATA_DIR / flight_file
-        merged_df = merge_data.load_and_merge_notebook_pair(weather_fp, flight_fp)
+        
+        # Use the enhanced merge function that adds lag features
+        merged_df = merge_data.load_and_merge_with_lag_features(weather_fp, flight_fp)
+        
         if not merged_df.empty:
+            # Calculate percentage of rows with weather data
+            if 'weather_data_count' in merged_df.columns:
+                rows_with_weather = (merged_df['weather_data_count'] > 0).sum()
+                pct_with_weather = rows_with_weather / len(merged_df) * 100
+                logging.info(f"File pair has {pct_with_weather:.2f}% rows with weather data")
+                
+                # Drop rows without any weather data to improve quality
+                if pct_with_weather < 90:  # If we have poor weather coverage
+                    original_len = len(merged_df)
+                    merged_df = merged_df[merged_df['weather_data_count'] > 0].copy()
+                    logging.info(f"Filtered to only rows with weather data: {len(merged_df)} of {original_len} rows kept")
+                
+                # Drop the helper column
+                merged_df = merged_df.drop('weather_data_count', axis=1)
+            
+            # MEMORY OPTIMIZATION: Handle categorical columns early
+            # Convert categorical columns to category type to save memory
+            for col in ['Reporting_Airline', 'Origin', 'Dest']:
+                if col in merged_df.columns:
+                    merged_df[col] = merged_df[col].astype('category')
+            
             all_merged_list.append(merged_df)
+        
+        # Force garbage collection after each file pair
+        gc.collect()
 
     if not all_merged_list:
         logging.error("No data loaded. Exiting.")
         return
 
+    # Combine all data
     combined_df = pd.concat(all_merged_list, ignore_index=True)
     logging.info(f"Combined DataFrame shape before engineering: {combined_df.shape}")
+    
+    # Free up memory
     del all_merged_list
+    gc.collect()
 
-    # --- Preprocessing including Feature Engineering ---
-    logging.info("Starting Preprocessing and Feature Engineering...")
-    X, y, final_feature_names = preprocessing.preprocess_notebook_style(combined_df)
+    # --- Data Quality Check ---
+    # Count non-null values in weather columns to ensure proper merge
+    weather_cols = [col for col in combined_df.columns if any(
+        col.startswith(f"{feat}_origin") or col.startswith(f"{feat}_dest") 
+        for feat in config.WEATHER_FEATURES_BASE
+    )]
+    
+    if weather_cols:
+        weather_cols_pct = combined_df[weather_cols].notna().mean() * 100
+        avg_completeness = weather_cols_pct.mean()
+        logging.info(f"Weather data completeness: {avg_completeness:.2f}% on average")
+        
+        # Log a few examples of the weather columns
+        sample_cols = weather_cols[:min(5, len(weather_cols))]
+        for col in sample_cols:
+            pct_present = weather_cols_pct[col]
+            logging.info(f"  - {col}: {pct_present:.2f}% non-null")
+    else:
+        logging.warning("No weather columns found in merged data!")
+
+    # --- MEMORY OPTIMIZATION: Apply chunking for large datasets ---
+    max_rows_per_chunk = 400000  # Adjust based on your available memory
+    
+    if len(combined_df) > max_rows_per_chunk:
+        logging.info(f"Dataset too large ({len(combined_df)} rows), processing in chunks")
+        
+        # Find a threshold to split the data
+        n_chunks = int(np.ceil(len(combined_df) / max_rows_per_chunk))
+        chunk_results = []
+        
+        for i in range(n_chunks):
+            start_idx = i * max_rows_per_chunk
+            end_idx = min((i + 1) * max_rows_per_chunk, len(combined_df))
+            
+            logging.info(f"Processing chunk {i+1}/{n_chunks} (rows {start_idx}-{end_idx})")
+            chunk_df = combined_df.iloc[start_idx:end_idx].copy()
+            
+            # Process this chunk
+            X_chunk, y_chunk, _ = preprocessing.preprocess_notebook_style(chunk_df)
+            
+            # Store results
+            if not X_chunk.empty:
+                chunk_results.append((X_chunk, y_chunk))
+            
+            # Free memory
+            del chunk_df
+            gc.collect()
+        
+        # Combine results from all chunks
+        if chunk_results:
+            X = pd.concat([res[0] for res in chunk_results], ignore_index=True)
+            y = pd.concat([res[1] for res in chunk_results], ignore_index=True)
+            
+            # Make sure we have all features from all chunks
+            final_feature_names = X.columns.tolist()
+            
+            logging.info(f"Combined chunks: X={X.shape}, y={y.shape}")
+        else:
+            logging.error("No valid data after chunk processing")
+            return
+            
+        # Free memory
+        del chunk_results
+        gc.collect()
+        
+    else:
+        # For smaller datasets, process normally
+        logging.info("Starting Preprocessing and Feature Engineering...")
+        X, y, final_feature_names = preprocessing.preprocess_notebook_style(combined_df)
+    
+    # Free up memory
     del combined_df
+    gc.collect()
+    
     if X.empty:
         logging.error("Data preparation resulted in empty features. Exiting.")
         return
@@ -51,13 +154,46 @@ def run_enhanced_feature_pipeline():
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=config.TEST_SPLIT_SIZE, random_state=config.RANDOM_STATE)
     logging.info(f"Train shape: X={X_train.shape}, y={y_train.shape}")
     logging.info(f"Test shape: X={X_test.shape}, y={y_test.shape}")
+    
+    # Free up memory
+    del X, y
+    gc.collect()
+
+    # --- Feature Importance Check ---
+    # Log which features made it to the training set
+    categorical_features = [f for f in final_feature_names if '_' in f and any(cat in f for cat in ['Origin', 'Dest', 'Reporting_Airline'])]
+    weather_features = [f for f in final_feature_names if any(base in f for base in config.WEATHER_FEATURES_BASE)]
+    engineered_features = [f for f in final_feature_names if any(f in l for l in [
+        config.WEATHER_DESC_FEATURES_ALL, 
+        config.CYCLICAL_FEATURES_ALL,
+        config.THRESHOLD_FEATURES_ALL,
+        config.TREND_FEATURES_ALL,
+        config.INTERACTION_FEATURES_ALL
+    ])]
+    
+    logging.info(f"Feature categories in training data:")
+    logging.info(f"  - Categorical features: {len(categorical_features)}")
+    logging.info(f"  - Weather features: {len(weather_features)}")
+    logging.info(f"  - Engineered features: {len(engineered_features)}")
+    
+    # Log delay statistics
+    non_zero_delays = (y_train > 0).sum()
+    delay_ratio = non_zero_delays / len(y_train)
+    logging.info(f"Target variable statistics:")
+    logging.info(f"  - Non-zero delays: {non_zero_delays} ({delay_ratio:.2%})")
+    logging.info(f"  - Zero delays: {len(y_train) - non_zero_delays} ({1-delay_ratio:.2%})")
+    logging.info(f"  - Class imbalance ratio (zeros/non-zeros): {(len(y_train) - non_zero_delays) / non_zero_delays:.2f}")
 
     # --- Calculate sample weights ---
-    # Always calculate, but only use if config.USE_BALANCING is True later
+    # Make sure target is float64 before weight calculation to avoid float16 error
+    if y_train.dtype == np.float16:
+        y_train = y_train.astype(np.float64)
+        
     sample_weights = train.calculate_sample_weights(y_train)
 
     # --- Train and Evaluate All Models ---
-    models_to_try = ['LGBM', 'XGB', 'CatBoost']
+    # Start with just one model to avoid memory issues
+    models_to_try = ['LGBM']  # Start with just LGBM, can add 'XGB', 'CatBoost' later
     all_results = []
     best_model_info = {'model': None, 'metric': np.inf, 'name': 'None'} # Track best based on RMSE
 

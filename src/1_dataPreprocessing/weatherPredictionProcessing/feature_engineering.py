@@ -1,4 +1,4 @@
-# src/data_preprocessing/feature_engineering.py
+# src/1_dataPreprocessing/weatherPredictionProcessing/feature_engineering.py
 import pandas as pd
 import numpy as np
 import logging
@@ -188,38 +188,56 @@ def create_trend_features(df: pd.DataFrame) -> pd.DataFrame:
     logging.info(f"Finished creating {len(config.TREND_FEATURES_ALL)} trend features.")
     return df_copy
 
-# --- Interaction Features ---
+# --- Interaction Features (FIXED) ---
 def create_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
     """Creates interaction terms based on config."""
     logging.info("Creating interaction features...")
     df_copy = df.copy()
     new_cols = []
-    suffixes = ['_origin', '_dest'] # Apply interactions for T=0 weather
-
+    # Identify the available columns that have the base feature names
+    available_cols = df_copy.columns.tolist()
+    
+    # Log the available columns with these base names for debugging
+    base_names_to_check = set()
+    for col1_base, col2_base, _ in config.INTERACTION_FEATURE_PAIRS:
+        base_names_to_check.add(col1_base)
+        base_names_to_check.add(col2_base)
+    
+    # Check which base names exist in the data with various suffixes
+    for base_name in base_names_to_check:
+        matching_cols = [col for col in available_cols if base_name in col]
+        if not matching_cols:
+            logging.warning(f"No columns found matching base name '{base_name}'")
+        else:
+            logging.debug(f"Found columns matching '{base_name}': {matching_cols}")
+    
+    # For each suffix, try to find matching columns and create interactions
+    suffixes = ['_origin', '_dest']
     for col1_base, col2_base, type in config.INTERACTION_FEATURE_PAIRS:
         for suffix in suffixes:
-            col1 = f"{col1_base}{suffix}"
-            col2 = f"{col2_base}{suffix}"
-            interact_col = f'{col1_base}_x_{col2_base}{suffix}'
-
-            if col1 in df_copy.columns and col2 in df_copy.columns:
+            # Look for columns that most likely match our base name + suffix pattern
+            col1_candidates = [col for col in available_cols if col.startswith(f"{col1_base}{suffix}")]
+            col2_candidates = [col for col in available_cols if col.startswith(f"{col2_base}{suffix}")]
+            
+            # If we found candidate columns, use the first match
+            if col1_candidates and col2_candidates:
+                col1 = col1_candidates[0]
+                col2 = col2_candidates[0]
+                interact_col = f'{col1_base}_x_{col2_base}{suffix}'
+                
                 if type == 'multiply':
                     df_copy[interact_col] = (df_copy[col1].fillna(0) * df_copy[col2].fillna(0)).fillna(0)
                     new_cols.append(interact_col)
-                    logging.debug(f"Created interaction feature '{interact_col}'.")
-                # Add 'flag_and' logic if needed, ensuring flag columns exist first
+                    logging.debug(f"Created interaction feature '{interact_col}' using {col1} and {col2}")
                 elif type == 'flag_and':
-                     # Example assumes flag columns were already created (e.g., is_high_gust_origin)
-                     if col1 in config.THRESHOLD_FEATURES_ALL and col2 in config.THRESHOLD_FEATURES_ALL:
-                         df_copy[interact_col] = (df_copy[col1] * df_copy[col2]).astype(int)
-                         new_cols.append(interact_col)
-                         logging.debug(f"Created interaction feature '{interact_col}'.")
-                     else:
-                         logging.warning(f"Cannot create flag interaction '{interact_col}', base flags not found.")
-
+                    df_copy[interact_col] = ((df_copy[col1] > 0) & (df_copy[col2] > 0)).astype(int)
+                    new_cols.append(interact_col)
+                    logging.debug(f"Created flag interaction feature '{interact_col}' using {col1} and {col2}")
             else:
-                logging.warning(f"Cannot create interaction '{interact_col}', base columns missing.")
-
+                if not col1_candidates:
+                    logging.warning(f"No columns found matching '{col1_base}{suffix}'")
+                if not col2_candidates:
+                    logging.warning(f"No columns found matching '{col2_base}{suffix}'")
 
     config.INTERACTION_FEATURES_ALL = list(set(new_cols))
     logging.info(f"Finished creating {len(config.INTERACTION_FEATURES_ALL)} interaction features.")
@@ -236,7 +254,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     df_copy = create_cyclical_features(df_copy)
     df_copy = create_threshold_features(df_copy)
     df_copy = create_trend_features(df_copy)
-    df_copy = create_interaction_features(df_copy) # Requires update to use config list
+    df_copy = create_interaction_features(df_copy) # Fixed to better handle column naming
 
     # --- Dynamically Determine Final Features ---
     logging.info("Determining final feature set...")

@@ -1,2 +1,9 @@
 data/
-results/
+results/models
+src/config1.py
+src/2_weatherPrediction/evaluate1.py
+src/2_weatherPrediction/train1.py
+src/1_dataPreprocessing/weatherPredictionProcessing/preprocessing1.py
+src/1_dataPreprocessing/weatherPredictionProcessing/feature_engineering1.py
+src/1_dataPreprocessing/weatherPredictionProcessing/preprocessing1.py
+src/1_dataPreprocessing/weatherPredictionProcessing/merge_data1.py

@@ -43,6 +43,17 @@ TARGET_VARIABLE = "WeatherDelay"
 RANDOM_STATE = 42
 TEST_SPLIT_SIZE = 0.2
 
+# --- Missing Value Handling ---
+# If True, columns with >15% missing values will be dropped
+# If False, they will be imputed with median/mode
+DROP_HIGH_MISSING_COLUMNS = False
+
+# --- Memory Management Settings ---
+# Maximum number of categories to keep for each categorical feature
+MAX_CATEGORIES_DEST = 50       # For destination airports
+MAX_CATEGORIES_ORIGIN = 50     # For origin airports  
+MAX_CATEGORIES_AIRLINE = 20    # For airlines
+
 # --- Base Feature Definitions ---
 # Base schedule features from notebook logic
 SCHEDULE_FEATURES = [
@@ -58,7 +69,7 @@ WEATHER_FEATURES_BASE = [
 # Base features needed for loading weather files initially (for merge function)
 NOTEBOOK_FEATURES_TO_LOAD_WEATHER = WEATHER_FEATURES_BASE + ['weather_desc']
 # Base features needed for loading flight files initially
-FLIGHT_COLS_TO_LOAD = list(set(['FlightDate', 'CRSDepTime', TARGET_VARIABLE] + SCHEDULE_FEATURES))
+FLIGHT_COLS_TO_LOAD = list(set(['FlightDate', 'CRSDepTime', 'CRSArrTime', TARGET_VARIABLE] + SCHEDULE_FEATURES))
 
 # --- Feature Engineering Parameters ---
 # Lag Features
@@ -84,7 +95,9 @@ TREND_FEATURES_BASE = ['pressure_mb', 'temp_c', 'visibility_m']
 # Interaction Feature Pairs (Example - function in feature_engineering needs update to use this)
 INTERACTION_FEATURE_PAIRS = [
     ('wind_speed_kmph', 'precip_mm', 'multiply'),
-    # ('is_high_gust', 'is_freezing_precip', 'flag_and') # Requires flags created first
+    ('visibility_m', 'wind_gust_kmph', 'multiply'),
+    ('is_high_gust', 'is_freezing_precip', 'flag_and'),
+    ('is_low_vis', 'is_high_gust', 'flag_and')
 ]
 
 # Features to Drop *After* Engineering
@@ -118,16 +131,23 @@ LGBM_PARAMS = {'n_estimators': 300, 'learning_rate': 0.05, 'random_state': RANDO
 XGB_PARAMS = {'n_estimators': 300, 'learning_rate': 0.05, 'random_state': RANDOM_STATE, 'n_jobs': -1, 'objective': 'reg:squarederror'}
 CATBOOST_PARAMS = {'iterations': 300, 'learning_rate': 0.05, 'random_state': RANDOM_STATE, 'verbose': 0}
 
-# Balancing Strategy
+# Balancing Strategy - Enhanced
 USE_BALANCING = True # Control whether the "balanced" model run uses weights
 NON_ZERO_WEIGHT_MULTIPLIER = 10
+# New option: choose balancing method
+BALANCING_METHOD = 'quantile'  # Options: 'binary', 'balanced', 'quantile'
 
-# Hyperparameter Tuning Parameters (applied to LGBM in train.py example)
+# Hyperparameter Tuning Parameters
 TUNING_ENABLED = True
-TUNING_N_ITER = 10  # Reduced for faster testing - INCREASE LATER
-TUNING_CV = 2       # Reduced for faster testing - INCREASE LATER
+TUNING_N_ITER = 15  # Number of random configurations to try
+TUNING_CV = 3       # Cross-validation folds
 TUNING_SCORING = 'neg_mean_absolute_error' # Optimize for MAE
 
 # Evaluation Metric for Comparison (used in main.py to pick best)
 BEST_MODEL_METRIC = 'rmse' # Lower is better
-CLASSIFICATION_THRESHOLD = 0 
+CLASSIFICATION_THRESHOLD = 0  # Above this is considered delay
+
+# --- Plot Configuration ---
+PLOT_DPI = 300  # Resolution for saved plots
+PLOT_CMAP = 'viridis'  # Default colormap
+SAVE_ADDITIONAL_PLOTS = True  # Whether to save additional analysis plots
