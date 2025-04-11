@@ -1,0 +1,38 @@
+# FILE: .gitignore
+# --------------------------------------------------------------------------------
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+.env/
+
+# Data and Results (ignore contents, not the dirs themselves if empty)
+data/*
+!data/.gitkeep
+results/models/*
+!results/models/.gitkeep
+results/plots/*
+!results/plots/.gitkeep
+results/evaluation/*
+!results/evaluation/.gitkeep
+# If you want to track the final summary, uncomment the next line
+# !results/evaluation/evaluation_summary.csv
+
+# Test artifacts
+.pytest_cache/
+tests/test_results/
+
+# IDE specific files
+.idea/
+.vscode/
+
+# Other common ignores
+*.log
+*.tmp
+*.swp
+*~
