@@ -330,118 +330,45 @@ def create_chains(df, feature_cols, target_col, stats):
     print(f"Constructed {len(chains)} valid chains.")
     return np.array(chains, dtype=np.float32), np.array(labels, dtype=np.int64)
 
-
 def save_processed_data(chains, labels, stats):
-    if len(chains) == 0 or len(labels) == 0:
-        print("No chains or labels to save.")
-        return
+    if len(chains) == 0 or len(labels) == 0: print("No chains or labels to save."); return
     print(f"Splitting {len(chains)} chains into Train/Validation/Test sets...")
-    indices = np.arange(len(chains))
-    valid_stratify = True
-    stratify_split = None
+    indices = np.arange(len(chains)); valid_stratify = True; stratify_split = None
     try:
-        unique_labels, counts = np.unique(labels, return_counts=True)
-        min_samples_per_class_needed = 2
-        if len(unique_labels) < config.NUM_CLASSES:
-            print(f"Warning: Only {len(unique_labels)} classes present. Cannot fully stratify.")
-            valid_stratify = False
+        unique_labels, counts = np.unique(labels, return_counts=True); min_samples_per_class_needed = 2
+        if len(unique_labels) < config.NUM_CLASSES: print(f"Warning: Only {len(unique_labels)} classes present. Cannot fully stratify."); valid_stratify = False
         for count in counts:
-            if count < min_samples_per_class_needed * 2:
-                print(f"Warning: A class has only {count} samples. Stratification unreliable.")
-                valid_stratify = False
-                break
+             if count < min_samples_per_class_needed * 2: print(f"Warning: A class has only {count} samples. Stratification unreliable."); valid_stratify = False; break
         stratify_split = labels if valid_stratify else None
-        if not valid_stratify:
-            print("Proceeding with non-stratified split.")
-        train_val_indices, test_indices = train_test_split(
-            indices, test_size=config.TEST_SPLIT_RATIO, random_state=config.RANDOM_STATE, stratify=stratify_split
-        )
+        if not valid_stratify: print("Proceeding with non-stratified split.")
+        train_val_indices, test_indices = train_test_split(indices, test_size=config.TEST_SPLIT_RATIO, random_state=config.RANDOM_STATE, stratify=stratify_split)
         relative_val_size = config.VAL_SPLIT_RATIO / (1 - config.TEST_SPLIT_RATIO)
         stratify_tv_split = labels[train_val_indices] if stratify_split is not None else None
         if stratify_tv_split is not None:
-            tv_unique_labels, tv_counts = np.unique(stratify_tv_split, return_counts=True)
-            if len(tv_unique_labels) < len(unique_labels):
-                print("Warn: Not all classes in train/val subset. Using non-stratified for second split.")
-                stratify_tv_split = None
-            else:
-                for count in tv_counts:
-                    if count < min_samples_per_class_needed:
-                        print(f"Warn: Class in train/val subset has only {count} samples. Using non-stratified for second split.")
-                        stratify_tv_split = None
-                        break
-        train_indices, val_indices = train_test_split(
-            train_val_indices, test_size=relative_val_size, random_state=config.RANDOM_STATE, stratify=stratify_tv_split
-        )
+             tv_unique_labels, tv_counts = np.unique(stratify_tv_split, return_counts=True)
+             if len(tv_unique_labels) < len(unique_labels): print("Warn: Not all classes in train/val subset. Using non-stratified for second split."); stratify_tv_split = None
+             else:
+                  for count in tv_counts:
+                       if count < min_samples_per_class_needed: print(f"Warn: Class in train/val subset has only {count} samples. Using non-stratified for second split."); stratify_tv_split = None; break
+        train_indices, val_indices = train_test_split(train_val_indices, test_size=relative_val_size, random_state=config.RANDOM_STATE, stratify=stratify_tv_split)
     except ValueError as e:
-        print(f"Error during stratified split: {e}. Falling back to non-stratified split.")
-        train_val_indices, test_indices = train_test_split(
-            indices, test_size=config.TEST_SPLIT_RATIO, random_state=config.RANDOM_STATE
-        )
-        relative_val_size = config.VAL_SPLIT_RATIO / (1 - config.TEST_SPLIT_RATIO)
-        train_indices, val_indices = train_test_split(
-            train_val_indices, test_size=relative_val_size, random_state=config.RANDOM_STATE
-        )
-    
-    train_chains, train_labels = chains[train_indices], labels[train_indices]
-    val_chains, val_labels = chains[val_indices], labels[val_indices]
-    test_chains, test_labels = chains[test_indices], labels[test_indices]
-    print(f"Train set: {len(train_chains)} chains")
-    print(f"Validation set: {len(val_chains)} chains")
-    print(f"Test set: {len(test_chains)} chains")
-
-    # NEW: Balance the training set if the flag is enabled.
-    if hasattr(config, "BALANCED") and config.BALANCED:
-        print("Performing oversampling to balance the training set...")
-        from collections import Counter
-        unique_classes, class_counts = np.unique(train_labels, return_counts=True)
-        max_count = class_counts.max()
-        oversampled_chains = []
-        oversampled_labels = []
-        for cls in unique_classes:
-            cls_indices = np.where(train_labels == cls)[0]
-            n_samples = len(cls_indices)
-            n_to_add = max_count - n_samples
-            oversampled_chains.append(train_chains[cls_indices])
-            oversampled_labels.append(train_labels[cls_indices])
-            if n_to_add > 0:
-                add_indices = np.random.choice(cls_indices, size=n_to_add, replace=True)
-                oversampled_chains.append(train_chains[add_indices])
-                oversampled_labels.append(train_labels[add_indices])
-        train_chains = np.concatenate(oversampled_chains, axis=0)
-        train_labels = np.concatenate(oversampled_labels, axis=0)
-        shuf_indices = np.arange(len(train_labels))
-        np.random.shuffle(shuf_indices)
-        train_chains = train_chains[shuf_indices]
-        train_labels = train_labels[shuf_indices]
-        print(f"Balanced training set size: {len(train_labels)}")
-
-    print("Saving processed data...")
-    config.PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    np.save(config.TRAIN_CHAINS_FILE, train_chains)
-    np.save(config.TRAIN_LABELS_FILE, train_labels)
-    np.save(config.VAL_CHAINS_FILE, val_chains)
-    np.save(config.VAL_LABELS_FILE, val_labels)
-    np.save(config.TEST_CHAINS_FILE, test_chains)
-    np.save(config.TEST_LABELS_FILE, test_labels)
-    print("Saving data statistics...")
+         print(f"Error during stratified split: {e}. Falling back to non-stratified."); train_val_indices, test_indices = train_test_split(indices, test_size=config.TEST_SPLIT_RATIO, random_state=config.RANDOM_STATE); relative_val_size = config.VAL_SPLIT_RATIO / (1 - config.TEST_SPLIT_RATIO); train_indices, val_indices = train_test_split(train_val_indices, test_size=relative_val_size, random_state=config.RANDOM_STATE)
+    train_chains, train_labels = chains[train_indices], labels[train_indices]; val_chains, val_labels = chains[val_indices], labels[val_indices]; test_chains, test_labels = chains[test_indices], labels[test_indices]
+    print(f"Train set: {len(train_chains)} chains"); print(f"Validation set: {len(val_chains)} chains"); print(f"Test set: {len(test_chains)} chains")
+    print("Saving processed data..."); config.PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    np.save(config.TRAIN_CHAINS_FILE, train_chains); np.save(config.TRAIN_LABELS_FILE, train_labels); np.save(config.VAL_CHAINS_FILE, val_chains); np.save(config.VAL_LABELS_FILE, val_labels); np.save(config.TEST_CHAINS_FILE, test_chains); np.save(config.TEST_LABELS_FILE, test_labels)
+    print("Saving data statistics...");
     try:
         def convert_np_types(obj):
-            if isinstance(obj, np.integer):
-                return int(obj)
-            if isinstance(obj, np.floating):
-                return float(obj)
-            if isinstance(obj, np.ndarray):
-                return obj.tolist()
-            if isinstance(obj, dict):
-                return {k: convert_np_types(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [convert_np_types(i) for i in obj]
+            if isinstance(obj, np.integer): return int(obj)
+            if isinstance(obj, np.floating): return float(obj)
+            if isinstance(obj, np.ndarray): return obj.tolist()
+            if isinstance(obj, dict): return {k: convert_np_types(v) for k, v in obj.items()}
+            if isinstance(obj, list): return [convert_np_types(i) for i in obj]
             return obj
-        serializable_stats = convert_np_types(stats)
-        with open(config.DATA_STATS_FILE, 'w') as f:
-            json.dump(serializable_stats, f, indent=4)
-    except Exception as e:
-        print(f"Error saving data stats: {e}")
+        serializable_stats = convert_np_types(stats);
+        with open(config.DATA_STATS_FILE, 'w') as f: json.dump(serializable_stats, f, indent=4)
+    except Exception as e: print(f"Error saving data stats: {e}")
     print("Processed data saving complete.")
 
 def run_chain_construction():
@@ -462,4 +389,3 @@ def run_chain_construction():
 
 if __name__ == "__main__":
     run_chain_construction()
-

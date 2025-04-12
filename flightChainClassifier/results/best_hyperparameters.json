@@ -1,7 +1,7 @@
 {
-    "lr": 0.0008505708690933782,
-    "weight_decay": 9.671869668905537e-05,
-    "dropout_rate": 0.10309230029808275,
-    "lstm_hidden_size": 64,
-    "lstm_num_layers": 2
+    "lr": 4.824655246002793e-05,
+    "weight_decay": 3.432969899364423e-06,
+    "dropout_rate": 0.31014757706523,
+    "lstm_hidden_size": 256,
+    "lstm_num_layers": 1
 }
