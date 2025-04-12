@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 import numpy as np
 import json
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, accuracy_score
 import os
 import sys
@@ -29,7 +30,7 @@ except ImportError:
          print(f"CRITICAL: Error importing modules in evaluate.py: {e}")
          sys.exit(1)
 
-@torch.no_grad()  # Disable gradient calculations during evaluation
+@torch.no_grad()  # Decorator to disable gradient calculations
 def run_evaluation(model_type='simam'):
     """Loads the best model and evaluates it on the test set."""
     print(f"--- Starting Evaluation for {model_type.upper()} model ---")
@@ -38,7 +39,7 @@ def run_evaluation(model_type='simam'):
     # --- Load Data Stats (for num_features) ---
     data_stats = config.load_data_stats()
     if data_stats is None or 'num_features' not in data_stats:
-        print("Error: Could not load data stats or 'num_features' missing.")
+        print("Error: Could not load data stats or num_features missing.")
         sys.exit(1)
     num_features = data_stats['num_features']
 
@@ -46,7 +47,7 @@ def run_evaluation(model_type='simam'):
     try:
         test_dataset = FlightChainDataset(config.TEST_CHAINS_FILE, config.TEST_LABELS_FILE)
         test_loader = DataLoader(test_dataset, batch_size=config.BATCH_SIZE, shuffle=False,
-                                   num_workers=config.NUM_WORKERS, pin_memory=config.PIN_MEMORY)
+                                 num_workers=config.NUM_WORKERS, pin_memory=config.PIN_MEMORY)
     except FileNotFoundError:
         print("Error: Test data files (.npy) not found. Run chain_constructor first.")
         sys.exit(1)
@@ -61,62 +62,36 @@ def run_evaluation(model_type='simam'):
 
     print(f"Loading best model state from {config.MODEL_SAVE_PATH}...")
 
-    # --- Load Best Hyperparameters if Available ---
+    # --- Load Best Hyperparameters if applicable ---
     best_params = config.load_best_hyperparameters()
-    if best_params is not None:
-        print("Best hyperparameters loaded successfully.")
-    else:
-        print("No best hyperparameters found; using defaults.")
 
-    # --- Instantiate the Model based on model_type ---
+    # Instantiate model based on type, passing best hyperparameters for SIMAM if available.
     if model_type == 'cbam':
-        model = CBAM_CNN_Model(num_features=num_features, num_classes=config.NUM_CLASSES)
+         model = CBAM_CNN_Model(num_features=num_features, num_classes=config.NUM_CLASSES)
     elif model_type == 'simam':
-        if best_params is not None:
-            lstm_hidden = best_params.get("lstm_hidden_size", config.DEFAULT_LSTM_HIDDEN_SIZE)
-            lstm_layers = best_params.get("lstm_num_layers", config.DEFAULT_LSTM_NUM_LAYERS)
-            dropout_rate = best_params.get("dropout_rate", config.DEFAULT_DROPOUT_RATE)
-        else:
-            lstm_hidden = config.DEFAULT_LSTM_HIDDEN_SIZE
-            lstm_layers = config.DEFAULT_LSTM_NUM_LAYERS
-            dropout_rate = config.DEFAULT_DROPOUT_RATE
-        model = SimAM_CNN_LSTM_Model(
-            num_features=num_features,
-            num_classes=config.NUM_CLASSES,
-            lstm_hidden=lstm_hidden,
-            lstm_layers=lstm_layers,
-            dropout_rate=dropout_rate
-        )
-    elif model_type == 'qtsimam':
-        # Use the best hyperparameters for qtsimam as well.
-        if best_params is not None:
-            lstm_hidden = best_params.get("lstm_hidden_size", config.DEFAULT_LSTM_HIDDEN_SIZE)
-            lstm_layers = best_params.get("lstm_num_layers", config.DEFAULT_LSTM_NUM_LAYERS)
-            dropout_rate = best_params.get("dropout_rate", config.DEFAULT_DROPOUT_RATE)
-        else:
-            lstm_hidden = config.DEFAULT_LSTM_HIDDEN_SIZE
-            lstm_layers = config.DEFAULT_LSTM_NUM_LAYERS
-            dropout_rate = config.DEFAULT_DROPOUT_RATE
-        try:
-            from src.modeling.queue_augment_models import QTSimAM_CNN_LSTM_Model
-        except ImportError as e:
-            print(f"Error importing QTSimAM_CNN_LSTM_Model: {e}")
-            sys.exit(1)
-        model = QTSimAM_CNN_LSTM_Model(
-            num_features=num_features,
-            num_classes=config.NUM_CLASSES,
-            lstm_hidden=lstm_hidden,
-            lstm_layers=lstm_layers,
-            dropout_rate=dropout_rate
-        )
+         if best_params is not None:
+              lstm_hidden = best_params.get("lstm_hidden_size", config.DEFAULT_LSTM_HIDDEN_SIZE)
+              lstm_layers = best_params.get("lstm_num_layers", config.DEFAULT_LSTM_NUM_LAYERS)
+              dropout_rate = best_params.get("dropout_rate", config.DEFAULT_DROPOUT_RATE)
+         else:
+              lstm_hidden = config.DEFAULT_LSTM_HIDDEN_SIZE
+              lstm_layers = config.DEFAULT_LSTM_NUM_LAYERS
+              dropout_rate = config.DEFAULT_DROPOUT_RATE
+         model = SimAM_CNN_LSTM_Model(
+             num_features=num_features,
+             num_classes=config.NUM_CLASSES,
+             lstm_hidden=lstm_hidden,
+             lstm_layers=lstm_layers,
+             dropout_rate=dropout_rate
+         )
     else:
-        print(f"Error: Unknown model type '{model_type}'.")
-        sys.exit(1)
+         print(f"Error: Unknown model type '{model_type}'.")
+         sys.exit(1)
 
     try:
         model.load_state_dict(torch.load(config.MODEL_SAVE_PATH, map_location=device))
         model.to(device)
-        model.eval()  # Set the model to evaluation mode.
+        model.eval()  # Set to evaluation mode
         print("Model loaded successfully.")
     except Exception as e:
         print(f"Error loading model state_dict: {e}")
@@ -179,8 +154,7 @@ def run_evaluation(model_type='simam'):
 
     print(f"--- Evaluation Finished for {model_type.upper()} model ---")
 
-
 if __name__ == "__main__":
-    # Example: Running evaluation for qtsimam model (or change model_type as needed)
-    run_evaluation(model_type='qtsimam')
+    # Example: Run evaluation for SIMAM model (or change model_type to 'cbam' if desired)
+    run_evaluation(model_type='simam')
 
