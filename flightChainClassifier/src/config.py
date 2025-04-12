@@ -30,7 +30,7 @@ REQUIRED_RAW_COLS = [
     'ArrDelay', 'ArrDelayMinutes', #'ArrDel15', # Use ArrDelayMinutes as target
     'Cancelled', 'Diverted',
     'CRSElapsedTime', 'ActualElapsedTime', 'AirTime', 'Distance',
-    'TaxiOut', 'TaxiIn', # Example additional features
+    'WeatherDelay',
     # Add more relevant columns available in your merged file
 ]
 # The actual number of features AFTER processing (encoding, scaling, deriving)
