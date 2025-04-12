@@ -1,0 +1,11 @@
+pandas
+numpy<1.24
+scikit-learn
+torch>=1.8
+torchvision
+torchaudio # Often installed with torch
+matplotlib
+seaborn # For plotting confusion matrix
+tqdm
+optuna
+# Add other libraries if needed (e.g., for specific encodings)
