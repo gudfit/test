@@ -37,7 +37,7 @@ REQUIRED_RAW_COLS = [
 # Let's set this dynamically after feature engineering in chain_constructor.py
 # NUM_FEATURES = 38 # Target number - This will be saved in data_stats.json instead
 
-CHAIN_LENGTH = 2 # Number of flights per chain
+CHAIN_LENGTH = 3 # Number of flights per chain
 TARGET_COL_RAW = 'ArrDelayMinutes' # Raw delay column used for labeling
 
 # Max time diff allowed between arrival of flight N and departure of flight N+1

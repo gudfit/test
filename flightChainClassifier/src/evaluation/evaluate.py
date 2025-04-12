@@ -13,24 +13,24 @@ from tqdm import tqdm
 try:
     # Use absolute imports assuming project root is in path
     from src import config
-    from src.training.dataset import FlightChainDataset # Absolute
-    from src.modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model # Absolute
+    from src.training.dataset import FlightChainDataset
+    from src.modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model
 except ImportError:
     # Fallback if run directly or path is not set correctly
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    src_dir = os.path.dirname(script_dir) # evaluation -> src
-    project_dir = os.path.dirname(src_dir) # src -> flightChainClassifier
-    if project_dir not in sys.path: sys.path.insert(0, project_dir)
+    src_dir = os.path.dirname(script_dir)  # evaluation -> src
+    project_dir = os.path.dirname(src_dir)  # src -> flightChainClassifier
+    if project_dir not in sys.path:
+        sys.path.insert(0, project_dir)
     try:
         from src import config
         from src.training.dataset import FlightChainDataset
         from src.modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model
     except ImportError as e:
          print(f"CRITICAL: Error importing modules in evaluate.py: {e}")
-         traceback.print_exc()
          sys.exit(1)
 
-@torch.no_grad() # Decorator to disable gradient calculations
+@torch.no_grad()  # Decorator to disable gradient calculations
 def run_evaluation(model_type='simam'):
     """Loads the best model and evaluates it on the test set."""
     print(f"--- Starting Evaluation for {model_type.upper()} model ---")
@@ -61,18 +61,37 @@ def run_evaluation(model_type='simam'):
         sys.exit(1)
 
     print(f"Loading best model state from {config.MODEL_SAVE_PATH}...")
+
+    # --- Load Best Hyperparameters if applicable ---
+    best_params = config.load_best_hyperparameters()
+
+    # Instantiate model based on type, passing best hyperparameters for SIMAM if available.
     if model_type == 'cbam':
          model = CBAM_CNN_Model(num_features=num_features, num_classes=config.NUM_CLASSES)
     elif model_type == 'simam':
-         model = SimAM_CNN_LSTM_Model(num_features=num_features, num_classes=config.NUM_CLASSES)
-    else: # Should not happen if called from main
-        print(f"Error: Unknown model type '{model_type}'.")
-        sys.exit(1)
+         if best_params is not None:
+              lstm_hidden = best_params.get("lstm_hidden_size", config.DEFAULT_LSTM_HIDDEN_SIZE)
+              lstm_layers = best_params.get("lstm_num_layers", config.DEFAULT_LSTM_NUM_LAYERS)
+              dropout_rate = best_params.get("dropout_rate", config.DEFAULT_DROPOUT_RATE)
+         else:
+              lstm_hidden = config.DEFAULT_LSTM_HIDDEN_SIZE
+              lstm_layers = config.DEFAULT_LSTM_NUM_LAYERS
+              dropout_rate = config.DEFAULT_DROPOUT_RATE
+         model = SimAM_CNN_LSTM_Model(
+             num_features=num_features,
+             num_classes=config.NUM_CLASSES,
+             lstm_hidden=lstm_hidden,
+             lstm_layers=lstm_layers,
+             dropout_rate=dropout_rate
+         )
+    else:
+         print(f"Error: Unknown model type '{model_type}'.")
+         sys.exit(1)
 
     try:
         model.load_state_dict(torch.load(config.MODEL_SAVE_PATH, map_location=device))
         model.to(device)
-        model.eval() # Set to evaluation mode
+        model.eval()  # Set to evaluation mode
         print("Model loaded successfully.")
     except Exception as e:
         print(f"Error loading model state_dict: {e}")
@@ -85,11 +104,8 @@ def run_evaluation(model_type='simam'):
 
     for chains, labels in tqdm(test_loader, desc="Evaluating", leave=False):
         chains = chains.to(device)
-        # No need to send labels to device if just storing them
-
         outputs = model(chains)
         _, predicted = torch.max(outputs.data, 1)
-
         all_preds.extend(predicted.cpu().numpy())
         all_labels.extend(labels.numpy())
 
@@ -104,7 +120,7 @@ def run_evaluation(model_type='simam'):
 
     print(f"\nTest Accuracy: {accuracy:.4f}")
     print("\nClassification Report:")
-    print(classification_report(all_labels, all_preds, zero_division=0)) # Print formatted report too
+    print(classification_report(all_labels, all_preds, zero_division=0))
 
     # --- Save Metrics ---
     metrics_dict = {
@@ -124,15 +140,14 @@ def run_evaluation(model_type='simam'):
     plot_file_path = config.PLOTS_DIR / f"{model_type}_confusion_matrix.png"
     print(f"Saving confusion matrix plot to {plot_file_path}...")
     try:
-        # Define class labels (optional, improves plot readability)
         class_names = [f"Class {i}" for i in range(config.NUM_CLASSES)]
         display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
-        fig, ax = plt.subplots(figsize=(8, 8)) # Adjust figure size as needed
-        display.plot(ax=ax, cmap=plt.cm.Blues, values_format='d') # Use 'd' for integer format
+        fig, ax = plt.subplots(figsize=(8, 8))
+        display.plot(ax=ax, cmap=plt.cm.Blues, values_format='d')
         plt.title(f'Confusion Matrix - {model_type.upper()} Model')
         plt.tight_layout()
         plt.savefig(plot_file_path)
-        plt.close(fig) # Close the figure to free memory
+        plt.close(fig)
         print("Plot saved.")
     except Exception as e:
         print(f"Error saving confusion matrix plot: {e}")
@@ -140,5 +155,6 @@ def run_evaluation(model_type='simam'):
     print(f"--- Evaluation Finished for {model_type.upper()} model ---")
 
 if __name__ == "__main__":
-    # Example of how to run directly (choose model type)
-    run_evaluation(model_type='simam') # Or 'cbam'
+    # Example: Run evaluation for SIMAM model (or change model_type to 'cbam' if desired)
+    run_evaluation(model_type='simam')
+
