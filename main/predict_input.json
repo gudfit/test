@@ -67,5 +67,28 @@
     "WeatherDelay": null,
     "TaxiOut": null,
     "TaxiIn": null
+  },
+  {
+    "FlightDate": "2023-01-15",
+    "Tail_Number": "N67890",
+    "Reporting_Airline": "DL",
+    "Flight_Number_Reporting_Airline": "202",
+    "Origin": "ATL",
+    "Dest": "JFK",
+    "CRSDepTime": "1700",
+    "CRSArrTime": "1815",
+    "ArrDelayMinutes": null,
+    "Cancelled": 0.0,
+    "Diverted": 0.0,
+    "DepDelayMinutes": null,
+    "CRSElapsedTime": 75,
+    "DepTime": null,
+    "ArrTime": null,
+    "ActualElapsedTime": null,
+    "AirTime": null,
+    "Distance": 190,
+    "WeatherDelay": null,
+    "TaxiOut": null,
+    "TaxiIn": null
   }
 ]

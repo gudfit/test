@@ -1,12 +1,13 @@
 # FILE: requirements.txt
 # --------------------------------------------------------------------------------
 # Core ML
+
 numpy<1.24
 pandas
 scikit-learn
 lightgbm
-xgboost # If XGBoost is still needed after debloating
-catboost # If CatBoost is still needed after debloating
+xgboost
+catboost
 
 # Data Handling & Utilities
 joblib
@@ -17,5 +18,4 @@ matplotlib
 seaborn
 statsmodels # Check if still needed for LOWESS in plots
 
-# Optional: Testing
 pytest
