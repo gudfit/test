@@ -1,0 +1,33 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.env/
+
+# Data and results folders (ignore contents except for .gitkeep files)
+data/*
+!data/.gitkeep
+results/*
+!results/.gitkeep
+
+# Model artifacts (adjust as needed)
+models/*
+
+# Test artifacts
+.pytest_cache/
+tests/test_results/
+
+# IDE specific files
+.idea/
+.vscode/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*~
+

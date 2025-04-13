@@ -165,7 +165,6 @@ def train_single_model(model_type: str, X_train: pd.DataFrame, y_train: pd.Serie
             # XGBoost early stopping uses 'early_stopping_rounds' in fit()
             if eval_set:
                 fit_params.pop("callbacks", None) # Remove LGBM callback
-                fit_params["early_stopping_rounds"] = 100
                 fit_params["eval_set"] = [(X_train_processed, y_train)] + fit_params["eval_set"] # Add train set for eval metrics
                 fit_params["verbose"] = False # Suppress XGBoost verbosity during fit
 

@@ -14,18 +14,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 # File pairs for processing (Assuming these are the files to process)
-# "top10_us_airport_weather_20220901_20220930.csv",
-# "top10_us_airport_weather_20221201_20221231.csv",
 WEATHER_FILES = [
     "top10_us_airport_weather_20220301_20220331.csv",
     "top10_us_airport_weather_20220601_20220630.csv",
+    "top10_us_airport_weather_20220901_20220930.csv",
+    "top10_us_airport_weather_20221201_20221231.csv",
 ]
 
-# "On_Time_Reporting_Carrier_On_Time_Performance_(1987_present)_2022_9.csv",
-# "On_Time_Reporting_Carrier_On_Time_Performance_(1987_present)_2022_12.csv",
 FLIGHT_FILES = [
     "On_Time_Reporting_Carrier_On_Time_Performance_(1987_present)_2022_3.csv",
     "On_Time_Reporting_Carrier_On_Time_Performance_(1987_present)_2022_6.csv",
+    "On_Time_Reporting_Carrier_On_Time_Performance_(1987_present)_2022_9.csv",
+    "On_Time_Reporting_Carrier_On_Time_Performance_(1987_present)_2022_12.csv",
 ]
 
 # --- Results Paths ---
