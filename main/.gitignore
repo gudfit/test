@@ -14,7 +14,7 @@ env/
 # Data and Results (ignore contents, not the dirs themselves if empty)
 data/*
 mlData/*
-models/*
+models/fdpp_ml_voting_model.joblib
 !data/.gitkeep
 results/models/*
 !results/models/.gitkeep
