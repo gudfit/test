@@ -9,9 +9,9 @@ import os
 # Ensure src is in path to import other modules
 try:
     # Use absolute imports assuming project root is in path
-    from src.modeling.base_models import ConvBlock, StandardLSTM
-    from src.modeling.attention_modules import CBAM, SimAM
-    from src import config # Absolute import for config
+    from .base_models import ConvBlock, StandardLSTM
+    from .attention_modules import CBAM, SimAM
+    from .. import config
 except ImportError:
     # Fallback if run directly or path is not set correctly
     script_dir = os.path.dirname(os.path.abspath(__file__))

@@ -6,7 +6,7 @@ import os
 import sys
 try:
     # Assumes the script using this module adds project root to path
-    from src import config # Absolute import from src package
+    from .. import config 
 except ImportError:
     # Fallback if run directly or path is not set correctly
     script_dir = os.path.dirname(os.path.abspath(__file__))

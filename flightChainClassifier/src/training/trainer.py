@@ -14,9 +14,9 @@ import traceback
 
 # --- Path Setup & Imports ---
 try:
-    from src import config
-    from src.training.dataset import FlightChainDataset
-    from src.modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model
+    from .. import config # Goes up one level from training/ to src/
+    from .dataset import FlightChainDataset # dataset is in the same directory
+    from ..modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model 
 except ImportError:
     # Fallback if run directly or path is not set correctly
     script_dir = os.path.dirname(os.path.abspath(__file__))

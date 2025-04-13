@@ -4,8 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.modeling.base_models import ConvBlock
-
+from .base_models import ConvBlock
 ###############################################################################
 # 1. QUEUE-AUGMENTED SIMAM MODULE
 ###############################################################################
