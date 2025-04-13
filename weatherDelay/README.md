@@ -28,7 +28,7 @@ Setup:
 2.  Create and activate a virtual environment (Recommended using `uv`):
     ```bash
     # Create environment
-    uv venv <name>
+    uv venv --python 3.11 <name>
     # Activate (Linux/macOS)
     source <name>/bin/activate
     # Activate (Windows CMD/PowerShell)
