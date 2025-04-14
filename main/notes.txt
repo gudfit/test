@@ -1,0 +1,7 @@
+EDA,
+Implementation,
+Performance - time taken to evaluate,
+Model Development, Design,
+Include trials and process,
+
+Academic paper

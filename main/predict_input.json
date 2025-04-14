@@ -59,7 +59,7 @@
     "Diverted": 0.0,
     "DepDelayMinutes": null,
     "CRSElapsedTime": 75,
-    "DepTime": null,
+    "DepTime": "1630",
     "ArrTime": null,
     "ActualElapsedTime": null,
     "AirTime": null,

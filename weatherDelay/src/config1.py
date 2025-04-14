@@ -42,8 +42,8 @@ PIPELINE_SUFFIX = "weather_pred_v1" # Suffix for output files/plots for this run
 MODEL_TYPES_TO_RUN = ['LGBM'] # Models to train ('LGBM', 'XGB', 'CatBoost')
 RUN_UNBALANCED = True
 RUN_BALANCED = True
-USE_BALANCING_WEIGHTS = True  # Whether the "balanced" run actually uses weights
-TUNE_LGBM = True              # Whether to run hyperparameter tuning for LGBM
+USE_BALANCING_WEIGHTS = True # Whether the "balanced" run actually uses weights
+TUNE_LGBM = True # Whether to run hyperparameter tuning for LGBM
 
 # --- Core Variables ---
 TARGET_VARIABLE = "WeatherDelay"
@@ -61,7 +61,7 @@ WEATHER_FEATURES_BASE = [
     'cloud_cover_pct', 'visibility_m', 'wind_speed_kmph', 'wind_gust_kmph',
     'wind_dir_deg', 'precip_mm', 'total_daily_snow_cm', 'weather_desc'
 ]
-LAG_HOURS = [1, 3]  # Weather lag features to generate
+LAG_HOURS = [1, 3] # Weather lag features to generate
 WEATHER_FEATURES_TO_LAG = [f for f in WEATHER_FEATURES_BASE if f != 'weather_desc']
 
 # --- Feature Engineering Configuration ---
@@ -69,7 +69,7 @@ CATEGORICAL_FEATURES_BASE = ['Reporting_Airline', 'Origin', 'Dest']
 CYCLICAL_FEATURES_BASE = ['CRSDepHour', 'Month', 'DayOfWeek'] # Wind direction handled separately
 WEATHER_DESC_KEYWORDS = ['thunder', 'snow', 'ice', 'fog', 'heavy rain', 'freezing', 'mist', 'drizzle', 'hail', 'sleet']
 LOW_VIS_THRESHOLD_M = 1600
-HIGH_WIND_GUST_THRESHOLD_KMPH = 55  # Approx 30 knots
+HIGH_WIND_GUST_THRESHOLD_KMPH = 55 # Approx 30 knots
 FREEZING_TEMP_LOW = -2
 FREEZING_TEMP_HIGH = 2
 TREND_FEATURES_BASE = ['pressure_mb', 'temp_c', 'visibility_m']
@@ -83,22 +83,22 @@ INTERACTION_FEATURE_PAIRS = [
 DYNAMIC_FEATURE_LISTS = {
     'WEATHER_DESC': [], 'CYCLICAL': [], 'THRESHOLD': [], 'TREND': [], 'INTERACTION': []
 }
-FINAL_MODEL_FEATURES = []  # Populated after preprocessing
+FINAL_MODEL_FEATURES = [] # Populated after preprocessing
 
 # --- Preprocessing Configuration ---
-DROP_HIGH_MISSING_COLUMNS = False  # If True, drop cols with > 15% NaNs, else impute
-MAX_CATEGORIES_OHE = 50            # Max categories per feature for OHE (Origin, Dest)
-MAX_CATEGORIES_AIRLINE_OHE = 20    # Max categories for Reporting_Airline
-CHUNK_SIZE_PREPROCESSING = 400000  # Process in chunks if > this many rows
+DROP_HIGH_MISSING_COLUMNS = False # If True, drop cols with > 15% NaNs, else impute
+MAX_CATEGORIES_OHE = 50 # Max categories per feature for OHE (Origin, Dest)
+MAX_CATEGORIES_AIRLINE_OHE = 20 # Max categories for Reporting_Airline
+CHUNK_SIZE_PREPROCESSING = 400000 # Process in chunks if > this many rows
 
 # --- Modeling Parameters ---
-LGBM_PARAMS = {'random_state': RANDOM_STATE, 'n_jobs': -1, 'verbose': -1}  # Base params, tuning overrides
+LGBM_PARAMS = {'random_state': RANDOM_STATE, 'n_jobs': -1, 'verbose': -1} # Base params, tuning overrides
 XGB_PARAMS = {'random_state': RANDOM_STATE, 'n_jobs': -1, 'objective': 'reg:squarederror'}
 CATBOOST_PARAMS = {'random_state': RANDOM_STATE, 'verbose': 0}
 
 # Balancing Strategy
 BALANCING_METHOD = 'quantile'  # Options: 'binary', 'balanced', 'quantile'
-NON_ZERO_WEIGHT_MULTIPLIER = 10  # Used only if BALANCING_METHOD == 'binary'
+NON_ZERO_WEIGHT_MULTIPLIER = 10 # Used only if BALANCING_METHOD == 'binary'
 
 # Hyperparameter Tuning (LGBM)
 TUNING_N_ITER = 15
@@ -106,15 +106,10 @@ TUNING_CV = 3
 TUNING_SCORING = 'neg_mean_absolute_error'
 
 # --- Evaluation Configuration ---
-BEST_MODEL_METRIC = 'rmse'  
-# ---------------------------------------------------------------------
-# The ONLY change is here: Instead of multiple thresholds, we set [15].
-# ---------------------------------------------------------------------
-CLASSIFICATION_THRESHOLDS = [15]  # "Is delay > 15 minutes?"
-# ---------------------------------------------------------------------
-
-PLOT_SAMPLE_SIZE = 5000
-PLOT_DPI = 150
+BEST_MODEL_METRIC = 'rmse' # Metric to select best model (lower is better)
+CLASSIFICATION_THRESHOLDS = [0, 5, 10, 15, 30] # Thresholds for classification proxy metrics
+PLOT_SAMPLE_SIZE = 5000 # Sample size for scatter plots if dataset is large
+PLOT_DPI = 150 
 PLOT_CMAP = 'viridis'
 
 # --- Logging ---
@@ -130,5 +125,4 @@ def setup_logging():
     )
     logging.info(f"Logging setup complete. Log file: {log_file}")
 
-setup_logging()  # Setup logging when config is imported
-
+setup_logging() # Setup logging when config is imported
