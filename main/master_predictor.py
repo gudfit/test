@@ -595,20 +595,20 @@ if __name__ == "__main__":
     # Temporarily suppress traceback printing
     sys.tracebacklimit = 0
 
-    parser            = argparse.ArgumentParser(
-        description   ="Predict flight delay using a combined classifier/regressor model.",
-        formatter_class=argparse.RawTextHelpFormatter,
+    parser                                  = argparse.ArgumentParser(
+        description                         = "Predict flight delay using a combined classifier/regressor model.",
+        formatter_class                     = argparse.RawTextHelpFormatter,
     )
-    input_group       = parser.add_mutually_exclusive_group(required=True)
+    input_group                             = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument(
         "--flights-file",
-        type          = str,
-        help          = "Path to a JSON file containing flight context (list of dicts, ordered chronologically).",
+        type                                = str,
+        help                                = "Path to a JSON file containing flight context (list of dicts, ordered chronologically).",
     )
     input_group.add_argument(
         "--flights-cli",
-        type          = str,
-        help          = "JSON string containing flight context (list of dicts, ordered chronologically).",
+        type                                = str,
+        help                                = "JSON string containing flight context (list of dicts, ordered chronologically).",
     )
     args = parser.parse_args()
 
