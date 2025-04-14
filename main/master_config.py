@@ -1,7 +1,7 @@
 # master_predictor/master_config.py
 import pathlib
 import torch
-import pandas as pd
+import pandas as     pd
 from datetime import datetime
 
 MASTER_PREDICTOR_DIR           = pathlib.Path(__file__).parent.resolve()
