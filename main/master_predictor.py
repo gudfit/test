@@ -9,36 +9,58 @@ import os
 import traceback
 import argparse
 import warnings
+import io
+import contextlib
 from datetime import datetime, date, time
 from sklearn.preprocessing import MinMaxScaler, OrdinalEncoder
 
-# --- Suppress specific warnings (Optional) ---
-warnings.filterwarnings("ignore", category=UserWarning, message="X does not have valid feature names, but.*was fitted with feature names")
-warnings.filterwarnings("ignore", category=UserWarning, message="X has feature names, but.*was fitted without feature names")
-warnings.filterwarnings("ignore", category=FutureWarning, message="Downcasting object dtype arrays on .fillna*")
+# --- Suppress all warnings ---
+warnings.filterwarnings("ignore")
 
-# --- Configuration and Helper Import ---
-try:
-    from . import master_config as config
-    script_dir = os.path.dirname(__file__)
-    util_path = os.path.join(script_dir, 'utils')
-    if str(util_path) not in sys.path:
-        sys.path.insert(0, str(util_path))
-    from datetime_helpers import (
-        calculate_scheduled_datetimes,
-        calculate_actual_datetimes
-    )
-except ImportError:
-    import master_config as config
-    script_dir = os.path.dirname(__file__) if '__file__' in locals() else os.getcwd()
-    util_path = os.path.join(script_dir, 'utils')
-    if str(util_path) not in sys.path:
-        sys.path.insert(0, str(util_path))
-    from datetime_helpers import (
-        calculate_scheduled_datetimes,
-        calculate_actual_datetimes
-    )
-# --- End Configuration and Helper Import ---
+# --- Context manager to suppress stdout and stderr ---
+class SuppressOutput:
+    def __enter__(self):
+        # Save original stdout and stderr
+        self._original_stdout = sys.stdout
+        self._original_stderr = sys.stderr
+        # Create string buffers to capture output
+        self._stdout_buffer = io.StringIO()
+        self._stderr_buffer = io.StringIO()
+        # Redirect stdout and stderr to buffers
+        sys.stdout = self._stdout_buffer
+        sys.stderr = self._stderr_buffer
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Restore original stdout and stderr
+        sys.stdout = self._original_stdout
+        sys.stderr = self._original_stderr
+        # Discard captured output (or could return it if needed)
+        self._stdout_buffer.close()
+        self._stderr_buffer.close()
+
+# --- Configuration and Helper Import (with suppressed output) ---
+with SuppressOutput():
+    try:
+        from . import master_config as config
+        script_dir = os.path.dirname(__file__)
+        util_path = os.path.join(script_dir, 'utils')
+        if str(util_path) not in sys.path:
+            sys.path.insert(0, str(util_path))
+        from datetime_helpers import (
+            calculate_scheduled_datetimes,
+            calculate_actual_datetimes
+        )
+    except ImportError:
+        import master_config as config
+        script_dir = os.path.dirname(__file__) if '__file__' in locals() else os.getcwd()
+        util_path = os.path.join(script_dir, 'utils')
+        if str(util_path) not in sys.path:
+            sys.path.insert(0, str(util_path))
+        from datetime_helpers import (
+            calculate_scheduled_datetimes,
+            calculate_actual_datetimes
+        )
 
 DELAY_STATUS_MAP = {
     0: "On Time / Slight Delay (<= 15 min)",
@@ -54,47 +76,44 @@ class MasterPredictor:
     Combines models, loading preferentially from local 'models' dir.
     """
     def __init__(self):
-        print("Initializing MasterPredictor...")
-        self.config = config
-        self.device = config.DEVICE
-        self.chain_length = config.CHAIN_LENGTH
-        self.min_turnaround_sec = config.CHAIN_MIN_TURNAROUND_MINS * 60
-        self.max_ground_sec = config.CHAIN_MAX_GROUND_TIME.total_seconds()
+        with SuppressOutput():
+            self.config = config
+            self.device = config.DEVICE
+            self.chain_length = config.CHAIN_LENGTH
+            self.min_turnaround_sec = config.CHAIN_MIN_TURNAROUND_MINS * 60
+            self.max_ground_sec = config.CHAIN_MAX_GROUND_TIME.total_seconds()
 
-        self.chain_classifier_model = None
-        self.chain_data_stats = None
-        self.chain_scaler = None
-        self.chain_encoder = None
-        self.chain_scaler_features = []
-        self.chain_encoder_features = []
-        self.chain_final_feature_cols = []
-        self.regressor_model = None
+            self.chain_classifier_model = None
+            self.chain_data_stats = None
+            self.chain_scaler = None
+            self.chain_encoder = None
+            self.chain_scaler_features = []
+            self.chain_encoder_features = []
+            self.chain_final_feature_cols = []
+            self.regressor_model = None
 
-        # Determine paths *before* loading
-        self.chain_model_path_to_load = self._get_model_path(
-            config.LOCAL_MODELS_DIR,
-            config.CHAIN_MODEL_FILENAME,
-            config.ORIGINAL_CHAIN_MODEL_PATH
-        )
-        self.regressor_model_path_to_load = self._get_model_path(
-            config.LOCAL_MODELS_DIR,
-            config.REGRESSOR_MODEL_FILENAME,
-            config.ORIGINAL_REGRESSOR_MODEL_PATH
-        )
+            # Determine paths *before* loading
+            self.chain_model_path_to_load = self._get_model_path(
+                config.LOCAL_MODELS_DIR,
+                config.CHAIN_MODEL_FILENAME,
+                config.ORIGINAL_CHAIN_MODEL_PATH
+            )
+            self.regressor_model_path_to_load = self._get_model_path(
+                config.LOCAL_MODELS_DIR,
+                config.REGRESSOR_MODEL_FILENAME,
+                config.ORIGINAL_REGRESSOR_MODEL_PATH
+            )
 
-        self._load_chain_classifier_stats()
-        self._load_chain_classifier_model()
-        self._load_regressor_model()
-        print("MasterPredictor Initialization Complete.")
+            self._load_chain_classifier_stats()
+            self._load_chain_classifier_model()
+            self._load_regressor_model()
 
     def _get_model_path(self, local_dir, filename, fallback_path):
         """Checks local dir first, then fallback path."""
         local_path = local_dir / filename
         if local_path.exists():
-            print(f"Found model locally: {local_path}")
             return local_path
         elif fallback_path.exists():
-            print(f"Model not found locally. Using fallback path: {fallback_path}")
             return fallback_path
         else:
             raise FileNotFoundError(
@@ -106,7 +125,6 @@ class MasterPredictor:
         stats_path = self.config.CHAIN_DATA_STATS_FILE
         if not stats_path.exists():
              raise FileNotFoundError(f"Chain classifier data stats not found: {stats_path}")
-        print(f"Loading Chain Classifier data stats from: {stats_path}")
         try:
             with open(stats_path, 'r') as f:
                 self.chain_data_stats = json.load(f)
@@ -116,12 +134,9 @@ class MasterPredictor:
                 self.chain_scaler.min_ = np.array(scaler_params['min'])
                 self.chain_scaler.scale_ = np.array(scaler_params['scale'])
                 self.chain_scaler_features = scaler_params.get('feature_names', [])
-                if not self.chain_scaler_features:
-                    print("Warning: Scaler feature names missing.")
                 self.chain_scaler.n_features_in_ = len(self.chain_scaler_features)
             else:
                 self.chain_scaler = None
-                print("Warning: Scaler params incomplete.")
 
             encoder_cats = self.chain_data_stats.get('encoder_categories')
             if encoder_cats:
@@ -142,20 +157,13 @@ class MasterPredictor:
                           self.chain_encoder.fit(dummy_df_fit[self.chain_encoder_features])
                       except Exception:
                           self.chain_encoder = None
-                          print("Warning: Error fitting dummy OrdinalEncoder.")
                  else:
                      self.chain_encoder = None
-                     print("Warning: Could not prepare OrdinalEncoder categories.")
             else:
                  self.chain_encoder = None
-                 print("Warning: Encoder categories not found.")
 
             self.chain_final_feature_cols = self.chain_data_stats.get('feature_names', [])
-            if not self.chain_final_feature_cols:
-                print("Warning: Final feature list missing.")
-            print("Chain Classifier data stats loaded.")
         except Exception as e:
-            print(f"Error loading chain stats: {e}")
             raise
 
     def _load_chain_classifier_model(self):
@@ -165,7 +173,6 @@ class MasterPredictor:
         if not self.chain_model_path_to_load:
             raise ValueError("Chain classifier model path not determined.")
 
-        print(f"Loading Chain Classifier model from: {self.chain_model_path_to_load}")
         try:
             project_root_dir = self.config.CHAIN_CLASSIFIER_DIR.parent
             if str(project_root_dir) not in sys.path:
@@ -177,8 +184,8 @@ class MasterPredictor:
                 try:
                     with open(hyperparams_file, 'r') as f:
                         best_params = json.load(f)
-                except Exception as e:
-                    print(f"Warning: Could not load hyperparameters: {e}")
+                except Exception:
+                    pass
 
             from flightChainClassifier.src.modeling.flight_chain_models import SimAM_CNN_LSTM_Model
             classifier_config = None
@@ -186,7 +193,7 @@ class MasterPredictor:
                 from flightChainClassifier.src import config as original_classifier_config
                 classifier_config = original_classifier_config
             except ImportError:
-                print("Warning: Could not load classifier default config.")
+                pass
 
             num_features = self.chain_data_stats.get('num_features')
             if num_features is None:
@@ -215,16 +222,11 @@ class MasterPredictor:
             )
             self.chain_classifier_model.to(self.device)
             self.chain_classifier_model.eval()
-            print("Chain Classifier model loaded successfully.")
         except ImportError as e:
-            print(f"ImportError loading chain classifier: {e}")
             raise
         except RuntimeError as e:
-            print(f"RuntimeError loading chain state_dict (likely mismatch): {e}")
             raise
         except Exception as e:
-            print(f"Error loading chain classifier model: {e}")
-            traceback.print_exc()
             raise
 
     def _load_regressor_model(self):
@@ -234,23 +236,18 @@ class MasterPredictor:
         if not self.regressor_model_path_to_load:
             raise ValueError("Regressor model path not determined.")
 
-        print(f"Loading Regressor model from: {self.regressor_model_path_to_load}")
         try:
             self.regressor_model = joblib.load(self.regressor_model_path_to_load)
             if not hasattr(self.regressor_model, 'predict'):
                  raise TypeError("Loaded object is not a scikit-learn model.")
-            print("Regressor model loaded successfully.")
         except Exception as e:
-            print(f"Error loading regressor model: {e}")
             raise
 
     def _preprocess_for_classifier(self, flight_chain_dicts):
         """Preprocesses a list of flight dictionaries for the chain classifier."""
         if not self.chain_scaler or not self.chain_encoder or not self.chain_final_feature_cols:
-             print("Error: Chain classifier preprocessors (scaler/encoder/feature list) not initialized.")
              return None
         if len(flight_chain_dicts) != self.chain_length:
-             print(f"Error: Input for classifier preprocessing must have exactly {self.chain_length} flights.")
              return None
 
         all_features_list = []
@@ -258,7 +255,6 @@ class MasterPredictor:
             try:
                 sched_dep_dt, _ = calculate_scheduled_datetimes(flight_data)
                 if pd.isna(sched_dep_dt):
-                    print(f"Warning: Skipping flight {flight_idx+1} in chain due to invalid schedule time.")
                     return None
 
                 single_flight_df = pd.DataFrame([flight_data])
@@ -292,8 +288,7 @@ class MasterPredictor:
                 features_to_scale_df = pd.concat([df_num, df_encoded_cats], axis=1)
                 try:
                     features_to_scale_ordered = features_to_scale_df.reindex(columns=self.chain_scaler_features, fill_value=0.0)
-                except ValueError as reindex_err:
-                    print(f"Error reindexing features for scaling: {reindex_err}")
+                except ValueError:
                     return None
 
                 scaled_features = self.chain_scaler.transform(features_to_scale_ordered)
@@ -301,27 +296,22 @@ class MasterPredictor:
 
                 missing_final_features = [f for f in self.chain_final_feature_cols if f not in df_scaled.columns]
                 if missing_final_features:
-                    print(f"Error: Missing final features after scaling: {missing_final_features}")
                     return None
 
                 final_flight_features = df_scaled[self.chain_final_feature_cols].iloc[0].values
                 all_features_list.append(final_flight_features)
 
-            except Exception as flight_prep_e:
-                print(f"Error preprocessing flight {flight_idx+1} for classifier: {flight_prep_e}")
-                traceback.print_exc()
+            except Exception:
                 return None
 
         if len(all_features_list) != self.chain_length:
-            print(f"Error: Preprocessing resulted in {len(all_features_list)} flights, expected {self.chain_length}.")
             return None
 
         try:
             chain_features_np = np.stack(all_features_list, axis=0).astype(np.float32)
             chain_tensor = torch.tensor(chain_features_np).unsqueeze(0)
             return chain_tensor.to(self.device)
-        except Exception as tensor_e:
-            print(f"Error creating final tensor for classifier: {tensor_e}")
+        except Exception:
             return None
 
     def _is_valid_chain_transition(self, flight_prev, flight_curr):
@@ -391,7 +381,6 @@ class MasterPredictor:
             try:
                 processed_chain_tensor = self._preprocess_for_classifier(chain_for_classifier)
                 if processed_chain_tensor is None:
-                    print("Classifier preprocessing failed. Falling back to regressor.")
                     prediction_type = 'regressor_fallback'
                 else:
                     with torch.no_grad():
@@ -413,9 +402,7 @@ class MasterPredictor:
                         'status': 'success',
                         'message': f'{prediction_details} Used chain classifier.'
                     }
-            except Exception as e:
-                print(f"Error during classifier prediction: {e}. Falling back to regressor.")
-                traceback.print_exc()
+            except Exception:
                 prediction_type = 'regressor_fallback'
 
         # --- Fallback or Default: Use Regressor ---
@@ -487,8 +474,6 @@ class MasterPredictor:
                     'message': f'{prediction_details} Used regressor model.'
                 }
              except Exception as e:
-                print(f"Error during regressor prediction:")
-                traceback.print_exc()
                 return {
                     'prediction_type': final_prediction_type,
                     'value': None,
@@ -496,50 +481,52 @@ class MasterPredictor:
                     'message': f'Error during regressor prediction: {e}'
                 }
 
-# --- Main Execution Block (CLI Handling - Unchanged) ---
+# --- Main Execution Block (CLI Handling - Updated) ---
 if __name__ == "__main__":
+    # Temporarily suppress traceback printing
+    sys.tracebacklimit = 0
+    
     parser = argparse.ArgumentParser(
         description="Predict flight delay using a combined classifier/regressor model.",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument(
-        "--flights-file", type=str, required=True,
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument(
+        "--flights-file", type=str,
         help="Path to a JSON file containing flight context (list of dicts, ordered chronologically)."
     )
+    input_group.add_argument(
+        "--flights-cli", type=str,
+        help="JSON string containing flight context (list of dicts, ordered chronologically)."
+    )
     args = parser.parse_args()
-    print("\n--- Running MasterPredictor ---")
-    try:
-        predictor = MasterPredictor()
-        print(f"\n--- Predicting from file: {args.flights_file} ---")
-        if not os.path.exists(args.flights_file):
-            print(f"Error: Input file not found: {args.flights_file}")
-            sys.exit(1)
+    
+    with SuppressOutput():
         try:
-            with open(args.flights_file, 'r') as f:
-                flight_context_from_file = json.load(f)
-            if not isinstance(flight_context_from_file, list) or not flight_context_from_file:
-                print("Error: JSON must be a non-empty list.")
+            predictor = MasterPredictor()
+            
+            flight_context_data = None
+            
+            if args.flights_file:
+                if not os.path.exists(args.flights_file):
+                    sys.exit(1)
+                try:
+                    with open(args.flights_file, 'r') as f:
+                        flight_context_data = json.load(f)
+                except json.JSONDecodeError:
+                    sys.exit(1)
+            elif args.flights_cli:
+                try:
+                    flight_context_data = json.loads(args.flights_cli)
+                except json.JSONDecodeError:
+                    sys.exit(1)
+                    
+            if not isinstance(flight_context_data, list) or not flight_context_data:
                 sys.exit(1)
-            print(f"Read {len(flight_context_from_file)} flight records from file.")
-            prediction_result = predictor.predict(flight_context_from_file)
-            print("\n--- Prediction Result ---")
-            print(json.dumps(prediction_result, indent=4))
-            print("-------------------------")
-        except json.JSONDecodeError as e:
-            print(f"Error: Invalid JSON format: {e}")
+                
+            prediction_result = predictor.predict(flight_context_data)
+        except Exception:
             sys.exit(1)
-        except Exception as e:
-            print(f"Error processing file: {e}")
-            traceback.print_exc()
-            sys.exit(1)
-    except FileNotFoundError as e:
-        print(f"\nInitialization Failed: Model/stats file not found: {e}")
-        sys.exit(1)
-    except ImportError as e:
-        print(f"\nInitialization Failed: Module import error: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\nUnexpected error: {e}")
-        traceback.print_exc()
-        sys.exit(1)
-
+    
+    # Print only the final prediction result
+    print(json.dumps(prediction_result, indent=4))

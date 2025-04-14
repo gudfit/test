@@ -59,18 +59,6 @@ REGRESSOR_RAW_FEATURES = ['Origin', 'Dest', 'Reporting_Airline',
                           'FTD', 'PFD']
 
 # --- Log Configuration Paths ---
-print("--- Master Predictor Configuration ---")
-print(f"Device: {DEVICE}")
-print(f"Chain Length: {CHAIN_LENGTH}")
-print(f"Preferred Local Models Dir: {LOCAL_MODELS_DIR}")
-print(f"Chain Model Filename: {CHAIN_MODEL_FILENAME}")
-print(f"Regressor Model Filename: {REGRESSOR_MODEL_FILENAME}")
-print(f"Chain Stats Path: {CHAIN_DATA_STATS_FILE}")
-print(f"Fallback Chain Model Path: {ORIGINAL_CHAIN_MODEL_PATH}")
-print(f"Fallback Regressor Model Path: {ORIGINAL_REGRESSOR_MODEL_PATH}")
-print(f"Fallback Hyperparameters Path: {ORIGINAL_HYPERPARAMS_PATH}")
-print("-------------------------------------")
-
 # --- Basic Checks (Optional but Recommended) ---
 if not CHAIN_DATA_STATS_FILE.exists():
     print(f"WARNING: Chain Classifier data stats not found at {CHAIN_DATA_STATS_FILE}")
