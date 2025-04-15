@@ -11,9 +11,9 @@ from tqdm import tqdm
 
 try:
     # Use absolute imports assuming project root is in path
-    from src import config
-    from src.training.dataset import FlightChainDataset
-    from src.modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model
+    from .. import config # Goes up one level from evaluation/ to src/
+    from ..training.dataset import FlightChainDataset # Up to src/, down to training/
+    from ..modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model
 except ImportError:
     # Fallback if run directly or path is not set correctly
     script_dir = os.path.dirname(os.path.abspath(__file__))
