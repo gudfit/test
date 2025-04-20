@@ -15,6 +15,7 @@ env/
 data/*
 mlData/*
 !data/.gitkeep
+results/*
 results/models/*
 !results/models/.gitkeep
 results/plots/*
