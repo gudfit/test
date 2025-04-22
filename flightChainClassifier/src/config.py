@@ -20,7 +20,7 @@ RAW_DATA_FILE = DATA_DIR / '0_merged_raw_flights.csv' # Reusing merged file
 
 # --- Data Processing Parameters ---
 REQUIRED_RAW_COLS = [
-    'FlightDate', 'Tail_Number', 'Reporting_Airline', 'Flight_Number_Reporting_Airline',
+    'FlightDate', 'Tail_Number', 'Reporting_Airline',
     'Origin', 'Dest',
     'CRSDepTime', 'DepTime',
     'DepDelay', 'DepDelayMinutes',
