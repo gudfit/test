@@ -1,4 +1,3 @@
-# flightChainClassifier/src/evaluation/evaluate.py
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
@@ -7,12 +6,13 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, accuracy_score
 import os
 import sys
+import re  # For parsing state_dict keys
 from tqdm import tqdm
 
 try:
     # Use absolute imports assuming project root is in path
-    from .. import config # Goes up one level from evaluation/ to src/
-    from ..training.dataset import FlightChainDataset # Up to src/, down to training/
+    from .. import config  # Goes up one level from evaluation/ to src/
+    from ..training.dataset import FlightChainDataset  # Up to src/, down to training/
     from ..modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model
 except ImportError:
     # Fallback if run directly or path is not set correctly
@@ -69,44 +69,32 @@ def run_evaluation(model_type='simam'):
         print("No best hyperparameters found; using defaults.")
 
     # --- Instantiate the Model based on model_type ---
+    # First, inspect the saved state_dict to determine LSTM layer count
+    state_dict = torch.load(config.MODEL_SAVE_PATH, map_location=device)
+    lstm_layers_in_state = 1
+    for key in state_dict.keys():
+        m = re.match(r'lstm\.lstm\.weight_ih_l(\d+)', key)
+        if m:
+            layer_idx = int(m.group(1))
+            lstm_layers_in_state = max(lstm_layers_in_state, layer_idx + 1)
+    print(f"Using {lstm_layers_in_state} LSTM layer(s) based on saved state dict.")
+
+    # Instantiate with matching hyperparameters
     if model_type == 'cbam':
         model = CBAM_CNN_Model(num_features=num_features, num_classes=config.NUM_CLASSES)
     elif model_type == 'simam':
+        # Determine hyperparameters, but override lstm_layers to match state
         if best_params is not None:
             lstm_hidden = best_params.get("lstm_hidden_size", config.DEFAULT_LSTM_HIDDEN_SIZE)
-            lstm_layers = best_params.get("lstm_num_layers", config.DEFAULT_LSTM_NUM_LAYERS)
             dropout_rate = best_params.get("dropout_rate", config.DEFAULT_DROPOUT_RATE)
         else:
             lstm_hidden = config.DEFAULT_LSTM_HIDDEN_SIZE
-            lstm_layers = config.DEFAULT_LSTM_NUM_LAYERS
             dropout_rate = config.DEFAULT_DROPOUT_RATE
         model = SimAM_CNN_LSTM_Model(
             num_features=num_features,
             num_classes=config.NUM_CLASSES,
             lstm_hidden=lstm_hidden,
-            lstm_layers=lstm_layers,
-            dropout_rate=dropout_rate
-        )
-    elif model_type == 'qtsimam':
-        # Use the best hyperparameters for qtsimam as well.
-        if best_params is not None:
-            lstm_hidden = best_params.get("lstm_hidden_size", config.DEFAULT_LSTM_HIDDEN_SIZE)
-            lstm_layers = best_params.get("lstm_num_layers", config.DEFAULT_LSTM_NUM_LAYERS)
-            dropout_rate = best_params.get("dropout_rate", config.DEFAULT_DROPOUT_RATE)
-        else:
-            lstm_hidden = config.DEFAULT_LSTM_HIDDEN_SIZE
-            lstm_layers = config.DEFAULT_LSTM_NUM_LAYERS
-            dropout_rate = config.DEFAULT_DROPOUT_RATE
-        try:
-            from src.modeling.queue_augment_models import QTSimAM_CNN_LSTM_Model
-        except ImportError as e:
-            print(f"Error importing QTSimAM_CNN_LSTM_Model: {e}")
-            sys.exit(1)
-        model = QTSimAM_CNN_LSTM_Model(
-            num_features=num_features,
-            num_classes=config.NUM_CLASSES,
-            lstm_hidden=lstm_hidden,
-            lstm_layers=lstm_layers,
+            lstm_layers=lstm_layers_in_state,
             dropout_rate=dropout_rate
         )
     else:
@@ -114,7 +102,7 @@ def run_evaluation(model_type='simam'):
         sys.exit(1)
 
     try:
-        model.load_state_dict(torch.load(config.MODEL_SAVE_PATH, map_location=device))
+        model.load_state_dict(state_dict)
         model.to(device)
         model.eval()  # Set the model to evaluation mode.
         print("Model loaded successfully.")
@@ -182,5 +170,5 @@ def run_evaluation(model_type='simam'):
 
 if __name__ == "__main__":
     # Example: Running evaluation for qtsimam model (or change model_type as needed)
-    run_evaluation(model_type='qtsimam')
+    run_evaluation(model_type='simam')
 
