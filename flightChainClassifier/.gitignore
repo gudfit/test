@@ -11,6 +11,10 @@ venv/
 env/
 .env/
 
+# Text files
+results.txt
+./resultsimg
+
 # Data and Results (ignore contents, not the dirs themselves if empty)
 data/*
 mlData/*
