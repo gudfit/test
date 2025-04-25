@@ -20,8 +20,10 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from sklearn.metrics import (
-    accuracy_score, classification_report,
-    confusion_matrix, ConfusionMatrixDisplay
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    ConfusionMatrixDisplay,
 )
 import matplotlib.pyplot as plt
 
@@ -43,15 +45,17 @@ def _infer_from_state_dict(sd: dict[str, torch.Tensor]) -> tuple[int, int]:
     """Return (hidden_size, num_layers) by inspecting LSTM/QMogrifier weights."""
     lstm_keys = [k for k in sd if "lstm_stack.layers" in k and ".weight_ih" in k]
     num_layers = len(lstm_keys)
-    hidden_size = sd[lstm_keys[0]].shape[0] // 4        # weight_ih: (4*H, input)
+    hidden_size = sd[lstm_keys[0]].shape[0] // 4  # weight_ih: (4*H, input)
     return hidden_size, num_layers
 
 
 @torch.no_grad()
-def run_evaluation(*,
-                   model_type: str = "simam",
-                   lstm_layers: int | None = None,
-                   lstm_hidden_size: int | None = None) -> None:
+def run_evaluation(
+    *,
+    model_type: str = "simam",
+    lstm_layers: int | None = None,
+    lstm_hidden_size: int | None = None,
+) -> None:
     print(f"--- Starting Evaluation for {model_type.upper()} ---")
     device = config.DEVICE
 
@@ -63,9 +67,13 @@ def run_evaluation(*,
     num_features = stats["num_features"]
 
     test_ds = FlightChainDataset(config.TEST_CHAINS_FILE, config.TEST_LABELS_FILE)
-    test_loader = DataLoader(test_ds, batch_size=config.BATCH_SIZE,
-                             shuffle=False, num_workers=config.NUM_WORKERS,
-                             pin_memory=config.PIN_MEMORY)
+    test_loader = DataLoader(
+        test_ds,
+        batch_size=config.BATCH_SIZE,
+        shuffle=False,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=config.PIN_MEMORY,
+    )
 
     # ---------- checkpoint ------------------------------------------------
     ckpt_path = config.MODEL_SAVE_PATH
@@ -74,12 +82,15 @@ def run_evaluation(*,
         sys.exit(1)
 
     # ---------- gather arch hints ----------------------------------------
-    arch_meta:  dict[str, Any] = {}
-    arch_best:  dict[str, Any] = {}
+    arch_meta: dict[str, Any] = {}
+    arch_best: dict[str, Any] = {}
 
     # 1) best-params (lower priority)
-    best_file = (config.BEST_PARAMS_FILE.with_name("best_hyperparameters_qtsimam.json")
-                 if model_type == "qtsimam" else config.BEST_PARAMS_FILE)
+    best_file = (
+        config.BEST_PARAMS_FILE.with_name("best_hyperparameters_qtsimam.json")
+        if model_type == "qtsimam"
+        else config.BEST_PARAMS_FILE
+    )
     if best_file.exists():
         arch_best = json.loads(best_file.read_text())
         print(f"⤷ Loaded arch params from {best_file.name}")
@@ -91,16 +102,16 @@ def run_evaluation(*,
         print(f"⤷ Loaded arch params from {meta_path.name}")
 
     def resolve(key, cli_val, default):
-        if cli_val is not None:              # CLI wins
+        if cli_val is not None:  # CLI wins
             return cli_val
-        if key in arch_meta:                 # then meta
+        if key in arch_meta:  # then meta
             return arch_meta[key]
-        if key in arch_best:                 # then best-params
+        if key in arch_best:  # then best-params
             return arch_best[key]
-        return default                       # else default/None
+        return default  # else default/None
 
     hidden = resolve("lstm_hidden_size", lstm_hidden_size, None)
-    layers = resolve("lstm_num_layers",  lstm_layers,  None)
+    layers = resolve("lstm_num_layers", lstm_layers, None)
 
     # 3) tensor inference if still missing
     if hidden is None or layers is None:
@@ -122,14 +133,18 @@ def run_evaluation(*,
     if model_type == "cbam":
         model = CBAM_CNN_Model(num_features, config.NUM_CLASSES)
     elif model_type == "simam":
-        model = SimAM_CNN_LSTM_Model(num_features, config.NUM_CLASSES,
-                                     lstm_hidden=hidden, lstm_layers=layers)
+        model = SimAM_CNN_LSTM_Model(
+            num_features, config.NUM_CLASSES, lstm_hidden=hidden, lstm_layers=layers
+        )
     elif model_type == "qtsimam":
         from ..modeling.queue_augment_models import QTSimAM_CNN_LSTM_Model
-        model = QTSimAM_CNN_LSTM_Model(num_features, config.NUM_CLASSES,
-                                       lstm_hidden=hidden, lstm_layers=layers)
+
+        model = QTSimAM_CNN_LSTM_Model(
+            num_features, config.NUM_CLASSES, lstm_hidden=hidden, lstm_layers=layers
+        )
     else:
-        print(f"Unknown model_type '{model_type}'."); sys.exit(1)
+        print(f"Unknown model_type '{model_type}'.")
+        sys.exit(1)
 
     # strict=True detects mismatch immediately
     model.load_state_dict(torch.load(ckpt_path, map_location=device), strict=True)
@@ -140,7 +155,7 @@ def run_evaluation(*,
     for x, y in test_loader:
         preds.append(model(x.to(device)).argmax(1).cpu())
         labels.append(y)
-    preds  = torch.cat(preds).numpy()
+    preds = torch.cat(preds).numpy()
     labels = torch.cat(labels).numpy()
 
     # ---------- metrics ---------------------------------------------------
@@ -169,14 +184,24 @@ def run_evaluation(*,
 # ---------------- CLI wrapper ---------------------------------------------
 if __name__ == "__main__":
     import argparse
+
     cli = argparse.ArgumentParser()
     cli.add_argument("--model", default="simam", choices=["cbam", "simam", "qtsimam"])
-    cli.add_argument("--lstm-layers",      type=int, default=None,
-                     help="Override number of LSTM/QMogrifier layers")
-    cli.add_argument("--lstm-hidden-size", type=int, default=None,
-                     help="Override hidden size of LSTM/QMogrifier layers")
+    cli.add_argument(
+        "--lstm-layers",
+        type=int,
+        default=None,
+        help="Override number of LSTM/QMogrifier layers",
+    )
+    cli.add_argument(
+        "--lstm-hidden-size",
+        type=int,
+        default=None,
+        help="Override hidden size of LSTM/QMogrifier layers",
+    )
     args = cli.parse_args()
-    run_evaluation(model_type=args.model,
-                   lstm_layers=args.lstm_layers,
-                   lstm_hidden_size=args.lstm_hidden_size)
-
+    run_evaluation(
+        model_type=args.model,
+        lstm_layers=args.lstm_layers,
+        lstm_hidden_size=args.lstm_hidden_size,
+    )
