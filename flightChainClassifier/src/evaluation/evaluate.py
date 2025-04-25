@@ -1,16 +1,4 @@
 # flightChainClassifier/src/evaluation/evaluate.py
-"""
-Evaluate CBAM, SimAM or QTSimAM models on the test split.
-
-Architecture parameter precedence
----------------------------------
-1. CLI flags  (--lstm-layers, --lstm-hidden-size)
-2. <checkpoint>.meta.json           ← written every time training saves best
-3. results/best_hyperparameters*.json   (Optuna output)
-4. Tensor inference from checkpoint (hidden = w_ih.shape[0] // 4, layers = N)
-5. config.py defaults
-"""
-
 from __future__ import annotations
 import sys, json, warnings
 from pathlib import Path
