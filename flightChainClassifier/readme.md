@@ -7,11 +7,11 @@ A lightweight pipeline that
 3. **trains** a CNN + LSTM (with attention) to predict the **delay class** of the 3ʳᵈ flight.
 
 <p align="center">
-\[
+$
 \underbrace{\bigl[\;x^{(1)},\,x^{(2)},\,x^{(3)}\bigr]}_{\text{chain}}\;
 \;\xrightarrow{\;f_\theta\;}\;
 \hat y\in\{0,1,2,3,4\}
-\]
+$
 </p>
 
 ---
