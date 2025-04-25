@@ -86,6 +86,10 @@ PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 # NEW: Default balanced flag (False by default)
 BALANCED = False
 
+# NEW: Simulation-augmentation toggle
+USE_SIM_AUG = True     # turn off with False for ablation
+SIM_FACTOR  = 3        # every real chain spawns (SIM_FACTOR-1) jittered copies
+
 # --- Helper functions ---
 def load_data_stats():
     if DATA_STATS_FILE.exists():
