@@ -57,45 +57,6 @@ python -m src.main --skip-data --model qtsimam --epochs n
 | `--balanced`                               | oversample minority delay classes                              | off     |
 | `--skip-data / --skip-train / --skip-eval` | skip pipeline stages                                           | off     |
 
----
-
-## Maths
-
-### 1. Label mapping
-
-Let raw delay of flight 3 be $d=\text{ArrDelayMinutes}_{(3)}$.
-
-$$
-y=\begin{cases}
-0, & d\le 15 \\
-1, & 15<d\le 60 \\
-2, & 60<d\le 120\\
-3, & 120<d\le 240\\
-4, & d>240
-\end{cases}
-$$
-
-### 2. Synthetic jitter (optional)
-
-For each numeric feature $x$ we sample
-
-$$
-\tilde x = x + \varepsilon,
-\qquad
-\varepsilon \sim \mathcal N\!\bigl(0,\;0.05^{2}\bigr)
-$$
-
-producing _k_ extra chains per original.
-
-### 3. Loss
-
-Cross-entropy with optional class weights $w_c$:
-
-$$
-\mathcal L = -\sum_{c=0}^{4} w_c\,\mathbf 1_{[y=c]}\,\log p_{\theta}(y=c\mid x)
-$$
-
----
 
 ## Layout
 
