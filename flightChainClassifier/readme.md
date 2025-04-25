@@ -17,9 +17,8 @@ $$
 ## Installation
 
 ```bash
-git clone https://github.com/your-handle/flightChainClassifier.git
 cd flightChainClassifier
-python -m venv .venv && source .venv/bin/activate
+uv venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
