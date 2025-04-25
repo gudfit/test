@@ -291,14 +291,6 @@ def engineer_features(df):
         "scale": scaler.scale_.tolist(),
         "feature_names": numerical_to_scale,
     }
-    numeric_stats = {}
-    for col in numerical_to_scale:
-        s = features_df[col]
-        numeric_stats[col] = {
-            "mean": float(s.mean()),
-            "std":  float(s.std(ddof=0)),
-            "iqr":  float(s.quantile(0.75) - s.quantile(0.25))
-        }
 
     # --- 5. Define Final Feature Set ---
     # THESE are the columns that will form the input tensor for the model
@@ -314,7 +306,6 @@ def engineer_features(df):
         "feature_names": final_feature_cols,
         "encoder_categories": encoder_categories,
         "scaler_params": scaler_params,
-        'numeric_stats': numeric_stats,
     }
 
     # Return the DataFrame (which still contains the necessary ID/Time columns for chaining)

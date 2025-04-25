@@ -1,185 +1,218 @@
-# flightChainClassifier/src/main.py
-import sys
-import os
-import time
+# ────────────────────────────────────────────────────────────────
+#  flightChainClassifier / src / main.py
+# ────────────────────────────────────────────────────────────────
+"""
+Top-level orchestration script for the Flight-Chain-Delay pipeline.
+
+CLI options:
+  • Stage control: --skip-data / --skip-train / --skip-eval
+  • Model choice  : --model {cbam, simam, qtsimam}
+  • Data options  : --subsample, --balanced, --sim-factor
+  • Network params: --lstm-layers, --lstm-hidden-size
+  • Training opts : --batch-size, --epochs
+  • Hyper-params  : --use-best-params  (loads Optuna JSON if present)
+"""
+
+from __future__ import annotations
+
 import argparse
+import os
+import sys
+import time
 import traceback
+from pathlib import Path
 
-# --- Path Setup ---
+# ── Path setup ───────────────────────────────────────────────────
 try:
-    script_path = os.path.abspath(__file__)
-    src_dir = os.path.dirname(script_path)
-    project_dir = os.path.dirname(src_dir)
-    if project_dir not in sys.path:
-        sys.path.insert(0, project_dir)
-        print(f"Adjusted sys.path: Added '{project_dir}'")
-except NameError:
-    project_dir = os.path.abspath('.')
-    src_dir = os.path.join(project_dir, 'src')
-    if project_dir not in sys.path:
-        sys.path.insert(0, project_dir)
-    print("Warning: Could not determine script path automatically. Assuming running from project root.")
+    script_path = Path(__file__).resolve()
+    project_dir = script_path.parents[1]  # flightChainClassifier/
+    if str(project_dir) not in sys.path:
+        sys.path.insert(0, str(project_dir))
+        print(f"Adjusted sys.path: added project root → {project_dir}")
+except Exception:
+    # Fallback if __file__ isn’t set (e.g. in some interactive contexts)
+    project_dir = Path.cwd()
+    if str(project_dir) not in sys.path:
+        sys.path.insert(0, str(project_dir))
+    print(
+        "Warning: could not determine script path; "
+        "assuming current working directory is project root."
+    )
 
-# --- Imports ---
+# ── Imports ──────────────────────────────────────────────────────
 try:
     from src import config
     from src.data_processing.chain_constructor import run_chain_construction
     from src.training.trainer import run_training
     from src.evaluation.evaluate import run_evaluation
-    print("Successfully imported pipeline modules.")
-except ModuleNotFoundError as e:
-    print(f"Error: Could not import pipeline module - {e}.")
-    print("Please ensure all necessary __init__.py files exist.")
-    print(f"PYTHONPATH might need adjustment. Current sys.path: {sys.path}")
-    sys.exit(1)
-except ImportError as e:
-    print(f"Error importing pipeline modules: {e}")
-    traceback.print_exc()
-    sys.exit(1)
 except Exception as e:
-    print(f"An unexpected error occurred during imports: {e}")
+    print("\n‼️  Error importing pipeline modules:")
     traceback.print_exc()
     sys.exit(1)
 
-def main():
-    """
-    Main function to orchestrate the flight chain classification pipeline.
-    """
+
+# ─────────────────────────────────────────────────────────────────
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Flight Chain Delay Classification Pipeline: Process data, train, and evaluate models.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description="Flight-Chain classification pipeline",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument('--skip-data', action='store_true',
-                        help="Skip data processing (chain construction). Assumes data exists.")
-    parser.add_argument('--skip-train', action='store_true',
-                        help="Skip model training. Assumes a trained model exists for evaluation.")
-    parser.add_argument('--skip-eval', action='store_true',
-                        help="Skip model evaluation.")
-    parser.add_argument('--model', type=str, default='simam', choices=['cbam', 'simam', 'qtsimam'],
-                        help="Model architecture type to train and evaluate.")
-    parser.add_argument('--use-best-params', action='store_true',
-                        help=f"Load hyperparameters from '{config.BEST_PARAMS_FILE.name}' for training (if it exists).")
-    parser.add_argument('--subsample', type=float, default=config.SUBSAMPLE_DATA,
-                        help="Override subsample fraction for data processing/training (e.g., 0.1 for 10%). Set to 1.0 for full data.")
-    # NEW: Flag for balancing the training data.
-    parser.add_argument('--balanced', action='store_true',
-                        help="If provided, balance the training dataset via oversampling of minority classes.")
+
+    # Stage-control flags
+    parser.add_argument(
+        "--skip-data",
+        action="store_true",
+        help="Skip data processing (chains already built).",
+    )
+    parser.add_argument(
+        "--skip-train", action="store_true", help="Skip model training."
+    )
+    parser.add_argument("--skip-eval", action="store_true", help="Skip evaluation.")
+
+    # Model + data options
+    parser.add_argument(
+        "--model",
+        default="simam",
+        choices=["cbam", "simam", "qtsimam"],
+        help="Which architecture to train/evaluate.",
+    )
+    parser.add_argument(
+        "--subsample",
+        type=float,
+        default=config.SUBSAMPLE_DATA,
+        help="Fraction of rows kept when building chains " "(1.0 = full data).",
+    )
+    parser.add_argument(
+        "--balanced",
+        action="store_true",
+        help="Enable class-balanced oversampling on train set.",
+    )
+    parser.add_argument(
+        "--sim-factor",
+        type=int,
+        default=config.SIM_FACTOR,
+        metavar="K",
+        help="Synthetic jitter copies per real chain; " "1 = no augmentation.",
+    )
+
+    # Network hyper-parameters
+    parser.add_argument(
+        "--lstm-layers",
+        type=int,
+        default=None,
+        help="Override number of LSTM/QMogrifier layers.",
+    )
+    parser.add_argument(
+        "--lstm-hidden-size",
+        type=int,
+        default=None,
+        help="Override LSTM hidden state size.",
+    )
+    # Training specifics
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help="Mini-batch size (overrides config).",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=config.EPOCHS,
+        help="Training epochs (overrides config).",
+    )
+
+    # Misc
+    parser.add_argument(
+        "--use-best-params",
+        action="store_true",
+        help="Load Optuna-tuned hyper-parameters if JSON exists.",
+    )
+    parser.add_argument(
+        "--no-aug", action="store_true", help="Disable synthetic jitter altogether"
+    )
 
     args = parser.parse_args()
 
-    # Set the balanced flag in config
+    # ── Apply CLI overrides to config ────────────────────────────
     config.BALANCED = args.balanced
+    config.SIM_FACTOR = max(1, args.sim_factor)
+    config.USE_SIM_AUG = not args.no_aug and config.SIM_FACTOR > 1
 
-    print(f"\n=========================================")
-    print(f"--- Running Pipeline ---")
-    print(f"Model selected: {args.model.upper()}")
-    print(f"Use best params: {args.use_best_params}")
-    print(f"Subsample override: {args.subsample if args.subsample != config.SUBSAMPLE_DATA else 'Using config default'}")
-    print(f"Balanced Training Data: {config.BALANCED}")
-    print(f"=========================================")
-    pipeline_start = time.time()
+    config.SUBSAMPLE_DATA = args.subsample
+    if args.batch_size is not None:
+        config.BATCH_SIZE = args.batch_size
+    if args.epochs is not None:
+        config.EPOCHS = args.epochs
 
-    original_subsample = config.SUBSAMPLE_DATA
-    if args.subsample != config.SUBSAMPLE_DATA:
-        print(f"Overriding config.SUBSAMPLE_DATA with command line value: {args.subsample}")
-        config.SUBSAMPLE_DATA = args.subsample
+    # ── Banner ───────────────────────────────────────────────────
+    print("\n========== Pipeline ==========")
+    print(f" model            : {args.model.upper()}")
+    print(f" subsample        : {config.SUBSAMPLE_DATA}")
+    print(f" balanced         : {config.BALANCED}")
+    print(f" sim-factor       : {config.SIM_FACTOR}")
+    print(f" lstm layers      : {args.lstm_layers or 'auto'}")
+    print(f" lstm hidden size : {args.lstm_hidden_size or 'auto'}")
+    print(f" batch-size       : {config.BATCH_SIZE}")
+    print(f" epochs           : {config.EPOCHS}")
+    print(
+        f"augmentation     : {'ON ×'+str(config.SIM_FACTOR) if config.USE_SIM_AUG else 'OFF (pure chains)'}"
+    )
+    print("================================\n")
 
-    best_params = None
-    if args.use_best_params:
-        if not args.skip_train:
-            best_params = config.load_best_hyperparameters()
-            if best_params is None:
-                print(f"Warning: --use-best-params specified, but '{config.BEST_PARAMS_FILE.name}' not found or failed to load. Training will use defaults.")
-        else:
-            print("Info: --use-best-params flag ignored because training is skipped.")
-
+    # ── Stage 1: Data processing ─────────────────────────────────
     if not args.skip_data:
-        stage_start = time.time()
-        print("\n=== Stage 1: Data Processing (Chain Construction) ===")
-        try:
-            run_chain_construction()
-            print(f"\n--- Data Processing Complete ({time.time() - stage_start:.2f}s) ---")
-        except SystemExit:
-            print("\nPipeline halted during data processing.")
-            sys.exit(1)
-        except KeyboardInterrupt:
-            print("\nData processing stopped manually.")
-            sys.exit(1)
-        except Exception as e:
-            print(f"\n--- ERROR during Data Processing Stage ---")
-            traceback.print_exc()
-            sys.exit(1)
+        print("=== Stage 1 — Chain construction ===")
+        t0 = time.time()
+        run_chain_construction()
+        print(f"Data processing complete ({time.time() - t0:.1f}s)\n")
     else:
-        print("\n--- Skipping Data Processing ---")
-        required_files = [config.TRAIN_CHAINS_FILE, config.TRAIN_LABELS_FILE,
-                          config.VAL_CHAINS_FILE, config.VAL_LABELS_FILE,
-                          config.TEST_CHAINS_FILE, config.TEST_LABELS_FILE,
-                          config.DATA_STATS_FILE]
-        if not all(f.exists() for f in required_files):
-            print("Error: --skip-data used, but required processed data files are missing in:")
-            print(f"  {config.PROCESSED_DATA_DIR}")
-            print("Please run the pipeline without --skip-data first.")
+        # quick sanity check
+        required = [
+            config.TRAIN_CHAINS_FILE,
+            config.TRAIN_LABELS_FILE,
+            config.VAL_CHAINS_FILE,
+            config.VAL_LABELS_FILE,
+            config.TEST_CHAINS_FILE,
+            config.TEST_LABELS_FILE,
+        ]
+        if not all(p.exists() for p in required):
+            print("‼️  --skip-data used but processed .npy files are missing.")
             sys.exit(1)
-        else:
-            print("Required processed data files found.")
 
+    # ── Stage 2: Training ───────────────────────────────────────
     if not args.skip_train:
-        stage_start = time.time()
-        print(f"\n=== Stage 2: Training ({args.model.upper()} Model) ===")
-        try:
-            if args.model == 'qtsimam':
-                from src.modeling.queue_augment_models import QTSimAM_CNN_LSTM_Model
-                run_training(model_type='qtsimam', hyperparams=best_params)
-            else:
-                run_training(model_type=args.model, hyperparams=best_params)
-            print(f"\n--- Training Complete ({time.time() - stage_start:.2f}s) ---")
-        except SystemExit:
-            print("\nPipeline halted during training.")
-            sys.exit(1)
-        except KeyboardInterrupt:
-            print("\nTraining stopped manually.")
-        except Exception as e:
-            print(f"\n--- ERROR during Training Stage ---")
-            traceback.print_exc()
-            sys.exit(1)
+        print(f"=== Stage 2 — Training ({args.model.upper()}) ===")
+        t0 = time.time()
+        hp = None
+        if args.use_best_params:
+            hp = config.load_best_hyperparameters()
+        run_training(
+            model_type=args.model,
+            lstm_layers=args.lstm_layers,
+            lstm_hidden_size=args.lstm_hidden_size,
+            hyperparams=hp,
+        )
+        print(f"Training finished ({time.time() - t0:.1f}s)\n")
     else:
-        print("\n--- Skipping Training ---")
         if not args.skip_eval and not config.MODEL_SAVE_PATH.exists():
-            print(f"Error: --skip-train used, but model file not found for evaluation at:")
-            print(f"  {config.MODEL_SAVE_PATH}")
-            print("Please run training first or ensure the model path is correct.")
+            print("‼️  --skip-train given but model checkpoint is missing.")
             sys.exit(1)
 
+    # ── Stage 3: Evaluation ─────────────────────────────────────
     if not args.skip_eval:
-        stage_start = time.time()
-        print(f"\n=== Stage 3: Evaluation ({args.model.upper()} Model) ===")
-        try:
-            if args.model == 'qtsimam':
-                from src.modeling.queue_augment_models import QTSimAM_CNN_LSTM_Model
-                run_evaluation(model_type='qtsimam')
-            else:
-                run_evaluation(model_type=args.model)
-            print(f"\n--- Evaluation Complete ({time.time() - stage_start:.2f}s) ---")
-        except SystemExit:
-            print("\nPipeline halted during evaluation.")
-            sys.exit(1)
-        except KeyboardInterrupt:
-            print("\nEvaluation stopped manually.")
-            sys.exit(1)
-        except Exception as e:
-            print(f"\n--- ERROR during Evaluation Stage ---")
-            traceback.print_exc()
-            sys.exit(1)
-    else:
-        print("\n--- Skipping Evaluation ---")
+        print(f"=== Stage 3 — Evaluation ({args.model.upper()}) ===")
+        t0 = time.time()
+        run_evaluation(
+            model_type=args.model,
+            lstm_layers=args.lstm_layers,
+            lstm_hidden_size=args.lstm_hidden_size,
+        )
+        print(f"Evaluation finished ({time.time() - t0:.1f}s)\n")
 
-    pipeline_end = time.time()
-    total_duration = pipeline_end - pipeline_start
-    print(f"\n--- Pipeline Finished ---")
-    print(f"Total Execution Time: {total_duration:.2f} seconds ({total_duration / 60.0:.2f} minutes)")
+    print("Pipeline completed successfully.")
 
-    config.SUBSAMPLE_DATA = original_subsample
 
+# ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     main()
-
