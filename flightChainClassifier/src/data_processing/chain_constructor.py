@@ -151,9 +151,7 @@ def engineer_features(df):
     print(f"Engineering features...")
     features_df = df.copy()
 
-    # --- 1. Create Reliable Datetime Columns for Sorting and Validation ---
     print("Parsing and creating datetime columns...")
-    # ... (datetime parsing and overnight handling remains the same) ...
     try:
         features_df["FlightDate_dt"] = pd.to_datetime(
             features_df["FlightDate"], errors="coerce"
@@ -204,7 +202,6 @@ def engineer_features(df):
 
     features_df["DateTime_ToSortBy"] = features_df["SchedDepDateTime"]
 
-    # --- 2. Feature Selection & Derivation ---
     numerical_features_base = [
         "DepDelayMinutes",
         "CRSElapsedTime",
@@ -236,8 +233,6 @@ def engineer_features(df):
     features_to_process = numerical_features + temporal_features + categorical_features
     print(f"Columns identified for processing into features: {features_to_process}")
 
-    # *** CORRECTION HERE: Ensure ALL columns needed later are kept ***
-    # Columns needed for processing AND columns needed for chaining/validation/labeling
     required_cols_later = [
         "Tail_Number",
         "DateTime_ToSortBy",
@@ -245,7 +240,7 @@ def engineer_features(df):
         "SchedArrDateTime",
         "ActualDepDateTime",
         "ActualArrDateTime",
-    ]  # Ensure ActualArrDateTime is here
+    ]
     cols_to_keep_initial = list(set(required_cols_later + features_to_process))
 
     # Check if all initially kept columns exist
@@ -261,7 +256,6 @@ def engineer_features(df):
     # Select these columns initially
     features_df = features_df[cols_to_keep_initial].copy()
 
-    # --- 3. Encoding Categorical Features ---
     print(f"Encoding categorical columns: {categorical_features}")
     for col in categorical_features:
         features_df[col] = features_df[col].fillna("__MISSING__").astype(str)
@@ -274,7 +268,6 @@ def engineer_features(df):
         for col, cats in zip(categorical_features, encoder.categories_)
     }
 
-    # --- 4. Scaling Numerical Features ---
     numerical_to_scale = numerical_features + temporal_features + categorical_features
     print(f"Scaling numerical/encoded columns: {numerical_to_scale}")
     for col in numerical_to_scale:
@@ -296,13 +289,11 @@ def engineer_features(df):
         s = features_df[col]
         numeric_stats[col] = {
             "mean": float(s.mean()),
-            "std":  float(s.std(ddof=0)),
-            "iqr":  float(s.quantile(0.75) - s.quantile(0.25))
+            "std": float(s.std(ddof=0)),
+            "iqr": float(s.quantile(0.75) - s.quantile(0.25)),
         }
 
-    # --- 5. Define Final Feature Set ---
-    # THESE are the columns that will form the input tensor for the model
-    final_feature_cols = numerical_to_scale  # The final features are the scaled numerical/temporal/encoded categoricals
+    final_feature_cols = numerical_to_scale
     num_final_features = len(final_feature_cols)
     print(
         f"Final features for model input ({num_final_features}): {final_feature_cols}"
@@ -314,11 +305,9 @@ def engineer_features(df):
         "feature_names": final_feature_cols,
         "encoder_categories": encoder_categories,
         "scaler_params": scaler_params,
-        'numeric_stats': numeric_stats,
+        "numeric_stats": numeric_stats,
     }
 
-    # Return the DataFrame (which still contains the necessary ID/Time columns for chaining)
-    # along with the list of columns that constitute the *final features* for the model.
     return features_df, final_feature_cols, data_stats
 
 
@@ -377,7 +366,7 @@ def create_chains(df, feature_cols, target_col, stats):
     # Iterate up to len(df) to handle the last group after the loop
     for i in range(len(df) + 1):  # Iterate one index beyond the end
         # Determine if the current group should end
-        # It ends if we are past the last element OR if the tail number changes
+        # It ends if past the last element OR if the tail number changes
         should_process_group = False
         if i == len(df):  # Reached the end of the dataframe
             should_process_group = True
@@ -399,7 +388,7 @@ def create_chains(df, feature_cols, target_col, stats):
                 ):
                     idx_f1, idx_f2, idx_f3 = j, j + 1, j + 2
 
-                    # --- Validation Logic (using NumPy arrays) ---
+                    # --- Validation Logic ---
                     valid_chain = True
                     # Check 1: Actual Dep f2 > Actual Arr f1 + Min Turnaround
                     if actual_dep_times_sec[idx_f2] <= (
@@ -453,9 +442,6 @@ def create_chains(df, feature_cols, target_col, stats):
                         continue
                     chains.append(chain)
                     labels.append(int(label_class))
-            # else: # Group too short, do nothing (count skipped later)
-            #     pass
-
             # If we haven't reached the end of the dataframe, start the next group
             if i < len(df):
                 start_idx_group = i  # The current index starts the new group

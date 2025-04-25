@@ -22,15 +22,13 @@ import time
 import traceback
 from pathlib import Path
 
-# ── Path setup ───────────────────────────────────────────────────
 try:
     script_path = Path(__file__).resolve()
-    project_dir = script_path.parents[1]  # flightChainClassifier/
+    project_dir = script_path.parents[1]
     if str(project_dir) not in sys.path:
         sys.path.insert(0, str(project_dir))
         print(f"Adjusted sys.path: added project root → {project_dir}")
 except Exception:
-    # Fallback if __file__ isn’t set (e.g. in some interactive contexts)
     project_dir = Path.cwd()
     if str(project_dir) not in sys.path:
         sys.path.insert(0, str(project_dir))
@@ -39,7 +37,6 @@ except Exception:
         "assuming current working directory is project root."
     )
 
-# ── Imports ──────────────────────────────────────────────────────
 try:
     from src import config
     from src.data_processing.chain_constructor import run_chain_construction
@@ -51,7 +48,6 @@ except Exception as e:
     sys.exit(1)
 
 
-# ─────────────────────────────────────────────────────────────────
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Flight-Chain classification pipeline",
@@ -134,7 +130,6 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # ── Apply CLI overrides to config ────────────────────────────
     config.BALANCED = args.balanced
     config.SIM_FACTOR = max(1, args.sim_factor)
     config.USE_SIM_AUG = not args.no_aug and config.SIM_FACTOR > 1
@@ -145,7 +140,6 @@ def main() -> None:
     if args.epochs is not None:
         config.EPOCHS = args.epochs
 
-    # ── Banner ───────────────────────────────────────────────────
     print("\n========== Pipeline ==========")
     print(f" model            : {args.model.upper()}")
     print(f" subsample        : {config.SUBSAMPLE_DATA}")
@@ -156,18 +150,16 @@ def main() -> None:
     print(f" batch-size       : {config.BATCH_SIZE}")
     print(f" epochs           : {config.EPOCHS}")
     print(
-        f"augmentation     : {'ON ×'+str(config.SIM_FACTOR) if config.USE_SIM_AUG else 'OFF (pure chains)'}"
+        f" augmentation     : {'ON ×'+str(config.SIM_FACTOR) if config.USE_SIM_AUG else 'OFF (pure chains)'}"
     )
     print("================================\n")
 
-    # ── Stage 1: Data processing ─────────────────────────────────
     if not args.skip_data:
         print("=== Stage 1 — Chain construction ===")
         t0 = time.time()
         run_chain_construction()
         print(f"Data processing complete ({time.time() - t0:.1f}s)\n")
     else:
-        # quick sanity check
         required = [
             config.TRAIN_CHAINS_FILE,
             config.TRAIN_LABELS_FILE,
@@ -180,7 +172,6 @@ def main() -> None:
             print("‼️  --skip-data used but processed .npy files are missing.")
             sys.exit(1)
 
-    # ── Stage 2: Training ───────────────────────────────────────
     if not args.skip_train:
         print(f"=== Stage 2 — Training ({args.model.upper()}) ===")
         t0 = time.time()
@@ -199,7 +190,6 @@ def main() -> None:
             print("‼️  --skip-train given but model checkpoint is missing.")
             sys.exit(1)
 
-    # ── Stage 3: Evaluation ─────────────────────────────────────
     if not args.skip_eval:
         print(f"=== Stage 3 — Evaluation ({args.model.upper()}) ===")
         t0 = time.time()
@@ -213,6 +203,5 @@ def main() -> None:
     print("Pipeline completed successfully.")
 
 
-# ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     main()

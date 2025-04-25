@@ -7,33 +7,44 @@ import json
 # --- Project Structure ---
 SCRIPT_DIR = pathlib.Path(__file__).parent.resolve()
 PROJECT_ROOT = SCRIPT_DIR.parent
-DATA_DIR = PROJECT_ROOT / 'data'
-ML_DATA_DIR = PROJECT_ROOT / 'mlData'
-PROCESSED_DATA_DIR = ML_DATA_DIR / 'processed_chains'
-RESULTS_DIR = PROJECT_ROOT / 'results'
-MODELS_DIR = RESULTS_DIR / 'models'
-EVAL_DIR = RESULTS_DIR / 'evaluation'
-PLOTS_DIR = RESULTS_DIR / 'plots'
+DATA_DIR = PROJECT_ROOT / "data"
+ML_DATA_DIR = PROJECT_ROOT / "mlData"
+PROCESSED_DATA_DIR = ML_DATA_DIR / "processed_chains"
+RESULTS_DIR = PROJECT_ROOT / "results"
+MODELS_DIR = RESULTS_DIR / "models"
+EVAL_DIR = RESULTS_DIR / "evaluation"
+PLOTS_DIR = RESULTS_DIR / "plots"
 
 # --- Input Data ---
-RAW_DATA_FILE = DATA_DIR / '0_merged_raw_flights.csv' # Reusing merged file
+RAW_DATA_FILE = DATA_DIR / "0_merged_raw_flights.csv"  # Reusing merged file
 
 # --- Data Processing Parameters ---
 REQUIRED_RAW_COLS = [
-    'FlightDate', 'Tail_Number', 'Reporting_Airline',
-    'Origin', 'Dest',
-    'CRSDepTime', 'DepTime',
-    'DepDelay', 'DepDelayMinutes',
-    'CRSArrTime', 'ArrTime',
-    'ArrDelay', 'ArrDelayMinutes',
-    'Cancelled', 'Diverted',
-    'CRSElapsedTime', 'ActualElapsedTime', 'AirTime', 'Distance',
-    'WeatherDelay',
+    "FlightDate",
+    "Tail_Number",
+    "Reporting_Airline",
+    "Origin",
+    "Dest",
+    "CRSDepTime",
+    "DepTime",
+    "DepDelay",
+    "DepDelayMinutes",
+    "CRSArrTime",
+    "ArrTime",
+    "ArrDelay",
+    "ArrDelayMinutes",
+    "Cancelled",
+    "Diverted",
+    "CRSElapsedTime",
+    "ActualElapsedTime",
+    "AirTime",
+    "Distance",
+    "WeatherDelay",
 ]
 CHAIN_LENGTH = 3
-TARGET_COL_RAW = 'ArrDelayMinutes'
+TARGET_COL_RAW = "ArrDelayMinutes"
 MAX_GROUND_TIME = pd.Timedelta(hours=12)
-DELAY_THRESHOLDS = [-float('inf'), 15, 60, 120, 240, float('inf')]
+DELAY_THRESHOLDS = [-float("inf"), 15, 60, 120, 240, float("inf")]
 NUM_CLASSES = 5
 
 # Train/Val/Test Split Ratios
@@ -68,14 +79,14 @@ LSTM_BIDIRECTIONAL = False
 BEST_PARAMS_FILE = RESULTS_DIR / "best_hyperparameters.json"
 
 # --- Output Files ---
-TRAIN_CHAINS_FILE = PROCESSED_DATA_DIR / 'train_chains.npy'
-TRAIN_LABELS_FILE = PROCESSED_DATA_DIR / 'train_labels.npy'
-VAL_CHAINS_FILE = PROCESSED_DATA_DIR / 'val_chains.npy'
-VAL_LABELS_FILE = PROCESSED_DATA_DIR / 'val_labels.npy'
-TEST_CHAINS_FILE = PROCESSED_DATA_DIR / 'test_chains.npy'
-TEST_LABELS_FILE = PROCESSED_DATA_DIR / 'test_labels.npy'
-DATA_STATS_FILE = PROCESSED_DATA_DIR / 'data_stats.json'
-MODEL_SAVE_PATH = MODELS_DIR / 'flight_chain_model_best.pt'
+TRAIN_CHAINS_FILE = PROCESSED_DATA_DIR / "train_chains.npy"
+TRAIN_LABELS_FILE = PROCESSED_DATA_DIR / "train_labels.npy"
+VAL_CHAINS_FILE = PROCESSED_DATA_DIR / "val_chains.npy"
+VAL_LABELS_FILE = PROCESSED_DATA_DIR / "val_labels.npy"
+TEST_CHAINS_FILE = PROCESSED_DATA_DIR / "test_chains.npy"
+TEST_LABELS_FILE = PROCESSED_DATA_DIR / "test_labels.npy"
+DATA_STATS_FILE = PROCESSED_DATA_DIR / "data_stats.json"
+MODEL_SAVE_PATH = MODELS_DIR / "flight_chain_model_best.pt"
 
 # --- Ensure Directories Exist ---
 PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -83,18 +94,17 @@ MODELS_DIR.mkdir(parents=True, exist_ok=True)
 EVAL_DIR.mkdir(parents=True, exist_ok=True)
 PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# NEW: Default balanced flag (False by default)
 BALANCED = False
 
-# NEW: Simulation-augmentation toggle
-USE_SIM_AUG = True     # turn off with False for ablation
-SIM_FACTOR  = 3        # every real chain spawns (SIM_FACTOR-1) jittered copies
+USE_SIM_AUG = True
+SIM_FACTOR = 3
+
 
 # --- Helper functions ---
 def load_data_stats():
     if DATA_STATS_FILE.exists():
         try:
-            with open(DATA_STATS_FILE, 'r') as f:
+            with open(DATA_STATS_FILE, "r") as f:
                 stats = json.load(f)
             return stats
         except Exception as e:
@@ -104,25 +114,33 @@ def load_data_stats():
         print(f"Warning: Data stats file not found at {DATA_STATS_FILE}")
         return None
 
+
 def load_best_hyperparameters():
     if BEST_PARAMS_FILE.exists():
         print(f"Loading best hyperparameters from: {BEST_PARAMS_FILE}")
         try:
-            with open(BEST_PARAMS_FILE, 'r') as f:
+            with open(BEST_PARAMS_FILE, "r") as f:
                 params = json.load(f)
             print("Best hyperparameters loaded successfully.")
             return params
         except Exception as e:
-            print(f"Warning: Could not load best hyperparameters from {BEST_PARAMS_FILE}: {e}")
+            print(
+                f"Warning: Could not load best hyperparameters from {BEST_PARAMS_FILE}: {e}"
+            )
             return None
     else:
-        print(f"Warning: Best hyperparameters file not found at {BEST_PARAMS_FILE}. Using defaults.")
+        print(
+            f"Warning: Best hyperparameters file not found at {BEST_PARAMS_FILE}. Using defaults."
+        )
         return None
+
 
 print(f"--- Configuration ---")
 print(f"Device: {DEVICE}")
 print(f"Raw Data File: {RAW_DATA_FILE}")
-print(f"Subsample Fraction: {SUBSAMPLE_DATA if SUBSAMPLE_DATA < 1.0 else 'None (Full Data)'}")
+print(
+    f"Subsample Fraction: {SUBSAMPLE_DATA if SUBSAMPLE_DATA < 1.0 else 'None (Full Data)'}"
+)
 print(f"Chain Length: {CHAIN_LENGTH}")
 print(f"Number of Classes: {NUM_CLASSES}")
 print(f"Target Raw Column: {TARGET_COL_RAW}")
@@ -132,4 +150,3 @@ print(f"Epochs: {EPOCHS}")
 print(f"Learning Rate: {LEARNING_RATE}")
 print(f"Output Model Path: {MODEL_SAVE_PATH}")
 print(f"---------------------")
-
