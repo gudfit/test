@@ -1,9 +1,12 @@
 # flightChainClassifier/src/training/dataset.py
 import torch
 from torch.utils.data import Dataset
+
 import numpy as np
 import os
 import sys
+import json
+
 
 try:
     from .. import config
@@ -94,9 +97,6 @@ if __name__ == "__main__":
     if not all(p.exists() for p in required):
         print("Processed data not found – run the chain constructor first.")
         sys.exit(0)
-
-    import json
-
     with open(config.DATA_STATS_FILE) as f:
         stats = json.load(f)
 
