@@ -18,6 +18,8 @@ mako==1.3.10
 markupsafe==3.0.2
 matplotlib==3.10.1
 mpmath==1.3.0
+msgpack==1.1.0
+narwhals==1.36.0
 networkx==3.4.2
 numpy==2.2.4
 nvidia-cublas-cu12==12.4.5.8
@@ -37,6 +39,8 @@ optuna==4.3.0
 packaging==24.2
 pandas==2.2.3
 pillow==11.1.0
+plotly==6.0.1
+pynvim==0.5.2
 pyogrio==0.10.0
 pyparsing==3.2.3
 pyproj==3.7.1

@@ -1,211 +1,274 @@
-# flightChainClassifier/src/hyperparameter_tuning_qtsimam.py
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import sys
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 import optuna
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
-import numpy as np
-import sys
-import os
-import time
-import json
 from sklearn.utils.class_weight import compute_class_weight
-import traceback
-import argparse  # NEW: For parsing command-line arguments
+from torch.utils.data import DataLoader
+import plotly.io as pio
 
-# --- Path Setup & Imports ---
 try:
     from src import config
-    from src.training.dataset import FlightChainDataset
     from src.modeling.queue_augment_models import QTSimAM_CNN_LSTM_Model
+    from src.training.dataset import FlightChainDataset
     from src.training.trainer import validate_epoch
 except ImportError:
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(script_dir)
-    if project_dir not in sys.path:
-        sys.path.insert(0, project_dir)
-    try:
-        from src import config
-        from src.training.dataset import FlightChainDataset
-        from src.modeling.queue_augment_models import QTSimAM_CNN_LSTM_Model
-        from src.training.trainer import validate_epoch
-    except ImportError as e:
-        print(
-            f"CRITICAL: Error importing modules in hyperparameter_tuning_qtsimam.py: {e}"
-        )
-        sys.exit(1)
-
-# NEW: Command-line argument parsing for balanced flag.
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Hyperparameter Tuning for QTSimAM CNN-LSTM Model"
+    logging.warning(
+        "Project packages not found on PYTHONPATH. Attempting fallback import."
     )
+    script_dir = Path(__file__).resolve().parent
+    project_dir = script_dir.parent
+    sys.path.insert(0, str(project_dir))
+    from src import config  # type: ignore
+    from src.modeling.queue_augment_models import QTSimAM_CNN_LSTM_Model
+    from src.training.dataset import FlightChainDataset
+    from src.training.trainer import validate_epoch
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] %(levelname)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+
+def _parse_args() -> argparse.Namespace:
+    """Return parsed command‑line arguments."""
+    parser = argparse.ArgumentParser(description="Optuna search for QTSimAM model")
     parser.add_argument(
         "--balanced",
         action="store_true",
-        help="Use balanced training data by oversampling",
+        help="Oversample minority classes in the training set.",
     )
-    args = parser.parse_args()
-    config.BALANCED = args.balanced
-    print(
-        f"Hyperparameter Tuning (QTSimAM): Using balanced training data? {config.BALANCED}"
-    )
+    return parser.parse_args()
 
 
-def objective(trial: optuna.Trial) -> float:
-    print(f"\n--- Starting Optuna Trial {trial.number} for QTSimAM model ---")
+def _assert_required_files() -> None:
+    """Exit the program if any pre‑processed artefacts are missing."""
+    required: List[Path] = [
+        config.TRAIN_CHAINS_FILE,
+        config.TRAIN_LABELS_FILE,
+        config.VAL_CHAINS_FILE,
+        config.VAL_LABELS_FILE,
+        config.DATA_STATS_FILE,
+    ]
+    missing = [str(p) for p in required if not p.exists()]
+    if missing:
+        logger.error("Missing required data files:\n%s", "\n".join(missing))
+        sys.exit(1)
+    logger.info("All required data files located.")
+
+
+def _load_datasets(
+    batch_size: int,
+) -> Tuple[DataLoader, DataLoader, Optional[torch.Tensor], int]:
+    """Return train/val DataLoaders, class‑weights tensor, and feature count."""
+    data_stats: Optional[Dict[str, Any]] = config.load_data_stats()
+    if not data_stats or "num_features" not in data_stats:
+        raise RuntimeError(
+            "`num_features` not found in data_stats – run preprocessing first."
+        )
+
+    num_features = int(data_stats["num_features"])
+
+    train_ds = FlightChainDataset(config.TRAIN_CHAINS_FILE, config.TRAIN_LABELS_FILE)
+    val_ds = FlightChainDataset(config.VAL_CHAINS_FILE, config.VAL_LABELS_FILE)
+
+    class_weights_tensor: Optional[torch.Tensor] = None
+    if np.unique(train_ds.labels).size > 1:
+        class_weights = compute_class_weight(
+            class_weight="balanced",
+            classes=np.arange(config.NUM_CLASSES),
+            y=train_ds.labels,
+        )
+        class_weights_tensor = torch.tensor(class_weights, dtype=torch.float32).to(
+            config.DEVICE
+        )
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=config.PIN_MEMORY,
+        drop_last=True,
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=config.PIN_MEMORY,
+    )
+    return train_loader, val_loader, class_weights_tensor, num_features
+
+
+def _objective(trial: optuna.Trial) -> float:
+    """Train a QTSimAM model for one set of hyper‑parameters and return val loss."""
+    logger.info("Trial %d ⟶ suggesting hyper‑parameters", trial.number)
+
+    # Hyper‑parameter search space (ASCII minus signs!)
+    lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
+    weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-4, log=True)
+    dropout_rate = trial.suggest_float("dropout_rate", 0.2, 0.5)
+    lstm_hidden_size = trial.suggest_categorical("lstm_hidden_size", [64, 128])
+    lstm_num_layers = trial.suggest_int("lstm_num_layers", 1, 2)
+
     device = config.DEVICE
+
+    # Data
     try:
-        lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
-        weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-4, log=True)
-        dropout_rate = trial.suggest_float("dropout_rate", 0.2, 0.5)
-        lstm_hidden_size = trial.suggest_categorical("lstm_hidden_size", [64, 128])
-        lstm_num_layers = trial.suggest_int("lstm_num_layers", 1, 2)
-    except Exception as e:
-        print("Error during hyperparameter suggestion:", e)
+        train_loader, val_loader, class_weights, num_features = _load_datasets(
+            config.BATCH_SIZE
+        )
+    except Exception as exc:
+        logger.exception("Data loading failed: %s", exc)
         return float("inf")
-    print(
-        f"Trial {trial.number} Parameters: lr={lr:.1E}, weight_decay={weight_decay:.1E}, dropout_rate={dropout_rate:.2f}, lstm_hidden_size={lstm_hidden_size}, lstm_num_layers={lstm_num_layers}"
-    )
-    try:
-        data_stats = config.load_data_stats()
-        if data_stats is None or "num_features" not in data_stats:
-            print("Error: Data stats missing!")
-            return float("inf")
-        num_features = data_stats["num_features"]
-        train_dataset = FlightChainDataset(
-            config.TRAIN_CHAINS_FILE, config.TRAIN_LABELS_FILE
-        )
-        val_dataset = FlightChainDataset(config.VAL_CHAINS_FILE, config.VAL_LABELS_FILE)
-        class_weights_tensor = None
-        unique_classes_train, counts_train = np.unique(
-            train_dataset.labels, return_counts=True
-        )
-        if len(unique_classes_train) > 1:
-            class_weights = compute_class_weight(
-                class_weight="balanced",
-                classes=np.arange(config.NUM_CLASSES),
-                y=train_dataset.labels,
-            )
-            class_weights_tensor = torch.tensor(class_weights, dtype=torch.float32).to(
-                device
-            )
-        else:
-            print("Warning: Only one class in training set.")
-        batch_size = config.BATCH_SIZE
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=config.NUM_WORKERS,
-            pin_memory=config.PIN_MEMORY,
-            drop_last=True,
-        )
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=config.NUM_WORKERS,
-            pin_memory=config.PIN_MEMORY,
-        )
-    except Exception as e:
-        print("Error loading datasets:", e)
-        traceback.print_exc()
-        return float("inf")
-    try:
-        model = QTSimAM_CNN_LSTM_Model(
-            num_features=num_features,
-            num_classes=config.NUM_CLASSES,
-            lstm_hidden=lstm_hidden_size,
-            lstm_layers=lstm_num_layers,
-            dropout_rate=dropout_rate,
-        ).to(device)
-    except Exception as e:
-        print("Error initializing QTSimAM model:", e)
-        traceback.print_exc()
-        return float("inf")
-    if class_weights_tensor is not None:
-        criterion = nn.CrossEntropyLoss(weight=class_weights_tensor)
-    else:
-        criterion = nn.CrossEntropyLoss()
+
+    # Model & optimiser
+    model = QTSimAM_CNN_LSTM_Model(
+        num_features=num_features,
+        num_classes=config.NUM_CLASSES,
+        lstm_hidden=lstm_hidden_size,
+        lstm_layers=lstm_num_layers,
+        dropout_rate=dropout_rate,
+    ).to(device)
+
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    best_trial_val_loss = float("inf")
-    epochs_for_tuning = config.EPOCHS
-    for epoch in range(epochs_for_tuning):
+
+    best_val_loss = float("inf")
+
+    for epoch in range(config.EPOCHS):
         model.train()
-        total_train_loss = 0.0
-        train_samples = 0
+        running_loss = 0.0
+        samples = 0
+
         for chains, labels in train_loader:
             chains, labels = chains.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(chains)
             loss = criterion(outputs, labels)
-            if not torch.isfinite(loss):
-                continue
+            if torch.isnan(loss):
+                continue  # skip NaNs silently
+
             loss.backward()
             optimizer.step()
-            total_train_loss += loss.item() * chains.size(0)
-            train_samples += labels.size(0)
-        avg_train_loss = (
-            total_train_loss / train_samples if train_samples > 0 else float("inf")
-        )
+
+            running_loss += loss.item() * labels.size(0)
+            samples += labels.size(0)
+
+        avg_train_loss = running_loss / samples if samples else 0.0
         val_loss, val_acc = validate_epoch(model, val_loader, criterion, device)
-        print(
-            f"Epoch {epoch+1}/{epochs_for_tuning}: Train Loss: {avg_train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}"
+        best_val_loss = min(best_val_loss, val_loss)
+
+        logger.info(
+            "Epoch %02d | train %.4f | val %.4f | best %.4f | acc %.4f",
+            epoch + 1,
+            avg_train_loss,
+            val_loss,
+            best_val_loss,
+            val_acc,
         )
-        best_trial_val_loss = min(best_trial_val_loss, val_loss)
+
         trial.report(val_loss, epoch)
-        if trial.should_prune():
-            print(f"Trial {trial.number} pruned at epoch {epoch+1}")
-            return (
-                best_trial_val_loss
-                if np.isfinite(best_trial_val_loss)
-                else float("inf")
+        if trial.should_prune() or not np.isfinite(val_loss) or val_loss > 100.0:
+            logger.warning(
+                "Pruning/aborting trial %d at epoch %d", trial.number, epoch + 1
             )
-        if not np.isfinite(val_loss) or val_loss > 100.0:
-            print(f"Trial {trial.number} aborted due to unstable val loss: {val_loss}")
-            return float("inf")
-    print(
-        f"Trial {trial.number} finished with Best Val Loss: {best_trial_val_loss:.4f}"
+            raise optuna.TrialPruned()
+
+    return best_val_loss
+
+
+def _summarise_study(study: optuna.Study) -> None:
+    pruned = sum(t.state == optuna.trial.TrialState.PRUNED for t in study.trials)
+    complete = sum(t.state == optuna.trial.TrialState.COMPLETE for t in study.trials)
+    failed = sum(t.state == optuna.trial.TrialState.FAIL for t in study.trials)
+
+    logger.info(
+        "Trials — total: %d | complete: %d | pruned: %d | failed: %d",
+        len(study.trials),
+        complete,
+        pruned,
+        failed,
     )
-    return best_trial_val_loss
+
+    if complete:
+        best = study.best_trial
+        logger.info("Best trial #%d — loss: %.6f", best.number, best.value)
+        for k, v in best.params.items():
+            logger.info("  %s: %s", k, v)
 
 
-if __name__ == "__main__":
+def _export_results(study: optuna.Study, study_name: str) -> None:
+    if not study.trials:
+        return
+
+    config.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    best_params_file = config.RESULTS_DIR / "best_hyperparameters_qtsimam.json"
+
+    with open(best_params_file, "w", encoding="utf-8") as fp:
+        json.dump(study.best_trial.params, fp, indent=4)
+    logger.info("Best hyper‑parameters saved to %s", best_params_file)
+
+    try:
+        if optuna.visualization.is_available():
+            config.PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+            pio.write_image(
+                optuna.visualization.plot_optimization_history(study),
+                config.PLOTS_DIR / f"{study_name}_history.png",
+            )
+            if len(study.trials) >= 1:
+                pio.write_image(
+                    optuna.visualization.plot_param_importances(study),
+                    config.PLOTS_DIR / f"{study_name}_param_importance.png",
+                )
+            logger.info("Optuna figures stored in %s", config.PLOTS_DIR)
+        else:
+            logger.info(
+                "Install plotly for Optuna visualisations: `pip install plotly`"
+            )
+    except Exception:
+        logger.exception("Failed to generate Optuna figures.")
+
+
+def main() -> None:
+    args = _parse_args()
+    config.BALANCED = args.balanced
+    logger.info("Balanced oversampling enabled? %s", config.BALANCED)
+
+    _assert_required_files()
+
     study_name = "qtsimam_tuning_v1"
-    n_trials = 20
     study = optuna.create_study(
         direction="minimize",
         pruner=optuna.pruners.MedianPruner(n_warmup_steps=3, n_min_trials=5),
     )
-    study.optimize(objective, n_trials=n_trials, timeout=3600, n_jobs=1)
-    pruned_trials = [
-        t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED
-    ]
-    complete_trials = [
-        t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE
-    ]
-    fail_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.FAIL]
-    print(
-        f"\nStudy Summary: Total Trials: {len(study.trials)}, Complete: {len(complete_trials)}, Pruned: {len(pruned_trials)}, Failed: {len(fail_trials)}"
-    )
-    if complete_trials:
-        best_trial = study.best_trial
-        print(
-            f"\nBest Trial: Number: {best_trial.number}, Value (Loss): {best_trial.value:.6f}"
+
+    try:
+        study.optimize(
+            _objective,
+            n_trials=20,
+            timeout=1 * 3600,  # 1 hour
+            n_jobs=1,
         )
-        print("Parameters:")
-        for key, value in best_trial.params.items():
-            print(f"  {key}: {value}")
-        try:
-            config.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-            best_params_file = config.BEST_PARAMS_FILE.with_name(
-                "best_hyperparameters_qtsimam.json"
-            )
-            with open(best_params_file, "w") as f:
-                json.dump(best_trial.params, f, indent=4)
-            print(f"Best hyperparameters saved to {best_params_file}")
-        except Exception as e:
-            print(f"Error saving best hyperparameters: {e}")
-    else:
-        print("No trials completed successfully.")
+    except KeyboardInterrupt:
+        logger.warning("Tuning interrupted by user.")
+    finally:
+        _summarise_study(study)
+        _export_results(study, study_name)
+
+
+if __name__ == "__main__":
+    main()

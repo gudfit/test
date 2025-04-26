@@ -1,6 +1,6 @@
 # flightChainClassifier/src/training/augmentation.py
 import numpy as np
-from .. import config  # to access SIM_FACTOR if needed
+from .. import config
 
 
 def jitter_chain(chain_np, stats, jitter_prob=0.6, max_sigma=0.25):
@@ -9,10 +9,10 @@ def jitter_chain(chain_np, stats, jitter_prob=0.6, max_sigma=0.25):
 
     Parameters
     ----------
-    chain_np : np.ndarray, shape (SEQ, F)
-    stats    : dict taken from DATA_STATS (numeric_stats + feature_names)
-    jitter_prob : probability to perturb an individual feature
-    max_sigma   : maximum std-multiple to add / subtract
+        chain_np : np.ndarray, shape (SEQ, F)
+        stats    : dict taken from DATA_STATS (numeric_stats + feature_names)
+        jitter_prob : probability to perturb an individual feature
+        max_sigma   : maximum std-multiple to add / subtract
     """
     chain = chain_np.copy()
     for f_idx, fname in enumerate(stats["feature_names"]):
