@@ -145,3 +145,33 @@ class QTSimAM_CNN_LSTM_Model(nn.Module):
         return F.cross_entropy(logits, y) + self.aux_w * F.mse_loss(
             delta_pred, delta_true
         )
+
+
+# ---------------------------------------------------------------------
+# 4.  QT-SimAM + Soft-Max-Plus wrapper
+# ---------------------------------------------------------------------
+from .maxplus import SoftMaxPlus
+
+
+class QTSimAM_MaxPlus_Model(QTSimAM_CNN_LSTM_Model):
+    """
+    Identical to QTSimAM_CNN_LSTM_Model, but first estimates a soft
+    max-plus delay chain and concatenates it as an *extra feature*.
+    """
+
+    def __init__(self, *args, beta: float = 10.0, **kw):
+        super().__init__(*args, **kw)
+        self.maxplus = SoftMaxPlus(beta)
+
+    def forward(self, x):
+        # --- existing residual-delay proxies --------------------------
+        d_seq, lq_seq = self.queue_layer(x)  # (B,S,1)
+        α = d_seq.squeeze(-1) * lq_seq.squeeze(-1)  # crude inbound delay αᵢ
+        τ = torch.zeros_like(α).fill_(0.25)  # constant 15 min turnaround
+        c = α + torch.cat([τ[:, :-1], τ[:, :1]], 1) - τ  # (B,S)
+
+        δ_soft = self.maxplus(c)  # (B,S)
+        x_aug = torch.cat([x, δ_soft.unsqueeze(-1)], dim=2)  # extra feature
+
+        # continue with *parent* forward (which already has CNN→att→QMogrifier)
+        return super().forward(x_aug)

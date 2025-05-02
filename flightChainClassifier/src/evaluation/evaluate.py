@@ -20,6 +20,10 @@ try:
     from .. import config
     from ..training.dataset import FlightChainDataset
     from ..modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model
+    from ..modeling.queue_augment_models import (
+        QTSimAM_CNN_LSTM_Model,
+        QTSimAM_MaxPlus_Model,
+    )
 except ImportError:
     root = Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(root))
@@ -125,10 +129,12 @@ def run_evaluation(
             num_features, config.NUM_CLASSES, lstm_hidden=hidden, lstm_layers=layers
         )
     elif model_type == "qtsimam":
-        from ..modeling.queue_augment_models import QTSimAM_CNN_LSTM_Model
-
         model = QTSimAM_CNN_LSTM_Model(
             num_features, config.NUM_CLASSES, lstm_hidden=hidden, lstm_layers=layers
+        )
+    elif model_type == "qtsimam_mp":
+        model = QTSimAM_CNN_LSTM_Model(
+            num_features + 1, config.NUM_CLASSES, lstm_hidden=hidden, lstm_layers=layers
         )
     else:
         print(f"Unknown model_type '{model_type}'.")

@@ -16,6 +16,10 @@ try:
     from .. import config
     from .dataset import FlightChainDataset, FlightChainDatasetSim
     from ..modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model
+    from ..modeling.queue_augment_models import (
+        QTSimAM_CNN_LSTM_Model,
+        QTSimAM_MaxPlus_Model,
+    )
 except ImportError:
     # fallback when run as top-level module
     proj = Path(__file__).resolve().parents[2]
@@ -135,10 +139,16 @@ def run_training(
             dropout_rate=dropout,
         )
     elif model_type.lower() == "qtsimam":
-        from ..modeling.queue_augment_models import QTSimAM_CNN_LSTM_Model
-
         model = QTSimAM_CNN_LSTM_Model(
             num_feat,
+            config.NUM_CLASSES,
+            lstm_hidden=lstm_hidden_size,
+            lstm_layers=lstm_layers,
+            dropout_rate=dropout,
+        )
+    elif model_type.lower() == "qtsimam_mp":
+        model = QTSimAM_CNN_LSTM_Model(
+            num_feat + 1,
             config.NUM_CLASSES,
             lstm_hidden=lstm_hidden_size,
             lstm_layers=lstm_layers,

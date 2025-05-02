@@ -69,7 +69,7 @@ def main() -> None:
     parser.add_argument(
         "--model",
         default="simam",
-        choices=["cbam", "simam", "qtsimam"],
+        choices=["cbam", "simam", "qtsimam", "qtsimam_mp"],
         help="Which architecture to train/evaluate.",
     )
     parser.add_argument(
