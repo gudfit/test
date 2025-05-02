@@ -65,6 +65,11 @@ def main() -> None:
     )
     parser.add_argument("--skip-eval", action="store_true", help="Skip evaluation.")
 
+    parser.add_argument(
+        "--lstm-bidir",
+        action="store_true",  # <-- new
+        help="Use bidirectional LSTM/QMogrifier stack (SimAM & QT variants).",
+    )
     # Model + data options
     parser.add_argument(
         "--model",
@@ -182,6 +187,7 @@ def main() -> None:
             model_type=args.model,
             lstm_layers=args.lstm_layers,
             lstm_hidden_size=args.lstm_hidden_size,
+            lstm_bidir=args.lstm_bidir,
             hyperparams=hp,
         )
         print(f"Training finished ({time.time() - t0:.1f}s)\n")
@@ -196,6 +202,7 @@ def main() -> None:
         run_evaluation(
             model_type=args.model,
             lstm_layers=args.lstm_layers,
+            lstm_bidir=args.lstm_bidir,
             lstm_hidden_size=args.lstm_hidden_size,
         )
         print(f"Evaluation finished ({time.time() - t0:.1f}s)\n")

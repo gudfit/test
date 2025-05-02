@@ -70,6 +70,7 @@ def run_training(
     batch_size: int | None = None,
     lstm_layers: int | None = None,
     lstm_hidden_size: int | None = None,
+    lstm_bidir: bool | None = None,
     hyperparams: dict | None = None,
 ):
     """Train the requested architecture."""
@@ -116,6 +117,8 @@ def run_training(
     lstm_hidden_size = lstm_hidden_size or (hyperparams or {}).get(
         "lstm_hidden_size", 128
     )
+    if lstm_bidir is None:  # CLI wins
+        lstm_bidir = getattr(config, "LSTM_BIDIRECTIONAL", False)
 
     lr = (hyperparams or {}).get("lr", config.DEFAULT_LEARNING_RATE)
     weight_decay = (hyperparams or {}).get("weight_decay", config.DEFAULT_WEIGHT_DECAY)
@@ -136,6 +139,7 @@ def run_training(
             config.NUM_CLASSES,
             lstm_hidden=lstm_hidden_size,
             lstm_layers=lstm_layers,
+            lstm_bidir=lstm_bidir,
             dropout_rate=dropout,
         )
     elif model_type.lower() == "qtsimam":
@@ -144,14 +148,16 @@ def run_training(
             config.NUM_CLASSES,
             lstm_hidden=lstm_hidden_size,
             lstm_layers=lstm_layers,
+            lstm_bidir=lstm_bidir,
             dropout_rate=dropout,
         )
     elif model_type.lower() == "qtsimam_mp":
-        model = QTSimAM_CNN_LSTM_Model(
+        model = QTSimAM_MaxPlus_Model(
             num_feat + 1,
             config.NUM_CLASSES,
             lstm_hidden=lstm_hidden_size,
             lstm_layers=lstm_layers,
+            lstm_bidir=lstm_bidir,
             dropout_rate=dropout,
         )
     else:
@@ -174,7 +180,7 @@ def run_training(
 
     print(
         f"🏋️  hidden={lstm_hidden_size}  layers={lstm_layers}  "
-        f"bs={batch_size}  epochs={epochs}"
+        f"bidir={lstm_bidir}   bs={batch_size}  epochs={epochs}"
     )
     for ep in range(1, epochs + 1):
         t0 = time.time()

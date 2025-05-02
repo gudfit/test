@@ -46,6 +46,7 @@ def run_evaluation(
     *,
     model_type: str = "simam",
     lstm_layers: int | None = None,
+    lstm_bidir: bool | None = None,
     lstm_hidden_size: int | None = None,
 ) -> None:
     print(f"--- Starting Evaluation for {model_type.upper()} ---")
@@ -104,6 +105,9 @@ def run_evaluation(
 
     hidden = resolve("lstm_hidden_size", lstm_hidden_size, None)
     layers = resolve("lstm_num_layers", lstm_layers, None)
+    bidir = resolve(
+        "lstm_bidir", lstm_bidir, getattr(config, "LSTM_BIDIRECTIONAL", False)
+    )
 
     # 3) tensor inference if still missing
     if hidden is None or layers is None:
@@ -119,22 +123,34 @@ def run_evaluation(
     if layers is None:
         layers = config.DEFAULT_LSTM_NUM_LAYERS
 
-    print(f"Using hidden={hidden}, layers={layers}")
+    print(f"Using hidden={hidden}, layers={layers}, bidir={bidir}")
 
     # ---------- build model ----------------------------------------------
     if model_type == "cbam":
         model = CBAM_CNN_Model(num_features, config.NUM_CLASSES)
     elif model_type == "simam":
         model = SimAM_CNN_LSTM_Model(
-            num_features, config.NUM_CLASSES, lstm_hidden=hidden, lstm_layers=layers
+            num_features,
+            config.NUM_CLASSES,
+            lstm_hidden=hidden,
+            lstm_layers=layers,
+            lstm_bidir=bidir,
         )
     elif model_type == "qtsimam":
         model = QTSimAM_CNN_LSTM_Model(
-            num_features, config.NUM_CLASSES, lstm_hidden=hidden, lstm_layers=layers
+            num_features,
+            config.NUM_CLASSES,
+            lstm_hidden=hidden,
+            lstm_layers=layers,
+            lstm_bidir=bidir,
         )
     elif model_type == "qtsimam_mp":
-        model = QTSimAM_CNN_LSTM_Model(
-            num_features + 1, config.NUM_CLASSES, lstm_hidden=hidden, lstm_layers=layers
+        model = QTSimAM_MaxPlus_Model(
+            num_features + 1,
+            config.NUM_CLASSES,
+            lstm_hidden=hidden,
+            lstm_layers=layers,
+            lstm_bidir=bidir,
         )
     else:
         print(f"Unknown model_type '{model_type}'.")

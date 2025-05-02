@@ -1,4 +1,3 @@
-# flightChainClassifier/src/modeling/queue_augment_models.py
 from __future__ import annotations
 
 import torch
@@ -6,8 +5,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base_models import ConvBlock
+from .maxplus import SoftMaxPlus
+from .. import config  # ← changed (for default flag)
 
 
+# ---------------------------------------------------------------------
+# 0. Residual-delay proxy (unchanged)
+# ---------------------------------------------------------------------
 class ResidualDelayLayer(nn.Module):
     def __init__(self, idx_distance: int, idx_airtime: int):
         super().__init__()
@@ -23,13 +27,16 @@ class ResidualDelayLayer(nn.Module):
         E_S = self.k_s * dist + self.eps
         lam = (air + self.eps) / self.k_a
         rho = torch.clamp(lam * E_S, max=0.99)
-        W_q = rho / (1 - rho + self.eps) * E_S * 0.5  # assume c²≈1
+        W_q = rho / (1 - rho + self.eps) * E_S * 0.5
         Wn = (W_q - W_q.amin()) / (W_q.amax() - W_q.amin() + self.eps)
         L_q = lam * W_q
         Ln = (L_q - L_q.amin()) / (L_q.amax() - L_q.amin() + self.eps)
         return Wn.unsqueeze(-1), Ln.unsqueeze(-1)  # (B,S,1)
 
 
+# ---------------------------------------------------------------------
+# 1. Queue-augmented SimAM (unchanged)
+# ---------------------------------------------------------------------
 class QTSimAM(nn.Module):
     def __init__(self, e_lambda: float = 1e-4):
         super().__init__()
@@ -42,6 +49,9 @@ class QTSimAM(nn.Module):
         return x * self.sigmoid(e)
 
 
+# ---------------------------------------------------------------------
+# 2. QMogrifier cell & forward stack (unchanged)
+# ---------------------------------------------------------------------
 class QMogrifierCell(nn.Module):
     def __init__(self, input_size: int, hidden_size: int):
         super().__init__()
@@ -65,11 +75,12 @@ class QMogrifierCell(nn.Module):
 class QMogrifierStack(nn.Module):
     def __init__(self, input_size: int, hidden_size: int, num_layers: int):
         super().__init__()
-        self.layers = nn.ModuleList()
-        for i in range(num_layers):
-            self.layers.append(
+        self.layers = nn.ModuleList(
+            [
                 QMogrifierCell(input_size if i == 0 else hidden_size, hidden_size)
-            )
+                for i in range(num_layers)
+            ]
+        )
 
     def forward(self, seq, d_seq, lq_seq):
         last_h = None
@@ -78,6 +89,29 @@ class QMogrifierStack(nn.Module):
         return seq, last_h
 
 
+# ---------------------------------------------------------------------
+# 3. *New* bidirectional wrapper
+# ---------------------------------------------------------------------
+class BiQMogrifierStack(nn.Module):
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int):
+        super().__init__()
+        self.fwd = QMogrifierStack(input_size, hidden_size, num_layers)
+        self.bwd = QMogrifierStack(input_size, hidden_size, num_layers)
+
+    def forward(self, seq, d_seq, lq_seq):  # (B,S,C)
+        seq_r = torch.flip(seq, [1])
+        d_r = torch.flip(d_seq, [1])
+        lq_r = torch.flip(lq_seq, [1])
+
+        _, h_f = self.fwd(seq, d_seq, lq_seq)
+        _, h_b = self.bwd(seq_r, d_r, lq_r)
+        h_concat = torch.cat([h_f, h_b], dim=1)
+        return None, h_concat
+
+
+# ---------------------------------------------------------------------
+# 4. Base QTSimAM CNN-LSTM model  (bidirectional flag added)
+# ---------------------------------------------------------------------
 class QTSimAM_CNN_LSTM_Model(nn.Module):
     def __init__(
         self,
@@ -87,16 +121,21 @@ class QTSimAM_CNN_LSTM_Model(nn.Module):
         cnn_channels: list[int] | None = None,
         kernel_size: int = 3,
         lstm_hidden: int = 128,
+        lstm_bidir: bool | None = None,  # ← changed
         lstm_layers: int = 1,
         dropout_rate: float = 0.2,
-    ) -> None:
+    ):
         super().__init__()
         cnn_channels = cnn_channels or [64, 128, 256]
+        # fallback to config default when flag not provided
+        if lstm_bidir is None:
+            lstm_bidir = getattr(config, "LSTM_BIDIRECTIONAL", False)
+
         self.cnn_blocks = nn.ModuleList()
         self.att_blocks = nn.ModuleList()
 
-        idx_distance = -3  # Distance
-        idx_airtime = -5  # AirTime
+        idx_distance = -3  # Distance column index
+        idx_airtime = -5  # AirTime column index
         self.queue_layer = ResidualDelayLayer(idx_distance, idx_airtime)
 
         ch_in = num_features
@@ -113,18 +152,23 @@ class QTSimAM_CNN_LSTM_Model(nn.Module):
             self.att_blocks.append(QTSimAM())
             ch_in = ch_out
 
-        # multilayer QMogrifier stack
-        self.lstm_stack = QMogrifierStack(ch_in, lstm_hidden, lstm_layers)
+        # --------------- QMogrifier stack -----------------------------
+        if lstm_bidir:
+            self.lstm_stack = BiQMogrifierStack(ch_in, lstm_hidden, lstm_layers)
+            self.classifier = nn.Linear(lstm_hidden * 2, num_classes)
+        else:
+            self.lstm_stack = QMogrifierStack(ch_in, lstm_hidden, lstm_layers)
+            self.classifier = nn.Linear(lstm_hidden, num_classes)
 
-        self.classifier = nn.Linear(lstm_hidden, num_classes)
-        self.delta_head = nn.Linear(lstm_hidden, 1)
+        self.delta_head = nn.Linear(lstm_hidden, 1)  # aux regression
         self.aux_w = 0.1
 
+    # -------------- forward ------------------------------------------
     def forward(self, x, *, return_aux=False):
         B, S, F = x.shape
         d_seq, lq_seq = self.queue_layer(x)  # (B,S,1)
 
-        # CNN + attention (work in (B,C,S))
+        # ----- CNN + queue-aware attention (B,C,S) ---------------
         z = x.permute(0, 2, 1)
         for conv, att in zip(self.cnn_blocks, self.att_blocks):
             z = conv(z)
@@ -133,7 +177,7 @@ class QTSimAM_CNN_LSTM_Model(nn.Module):
             z = att(z, d, l)
         z = z.permute(0, 2, 1)  # (B,S,C)
 
-        # QMogrifier stack
+        # ----- temporal stack ------------------------------------
         _, h_last = self.lstm_stack(z, d_seq, lq_seq)
 
         logits = self.classifier(h_last)
@@ -148,30 +192,23 @@ class QTSimAM_CNN_LSTM_Model(nn.Module):
 
 
 # ---------------------------------------------------------------------
-# 4.  QT-SimAM + Soft-Max-Plus wrapper
+# 5.  Soft-Max-Plus wrapper
 # ---------------------------------------------------------------------
-from .maxplus import SoftMaxPlus
-
-
 class QTSimAM_MaxPlus_Model(QTSimAM_CNN_LSTM_Model):
-    """
-    Identical to QTSimAM_CNN_LSTM_Model, but first estimates a soft
-    max-plus delay chain and concatenates it as an *extra feature*.
-    """
+    """Adds a differentiable max-plus delay chain as an extra input feature."""
 
     def __init__(self, *args, beta: float = 10.0, **kw):
         super().__init__(*args, **kw)
         self.maxplus = SoftMaxPlus(beta)
 
     def forward(self, x):
-        # --- existing residual-delay proxies --------------------------
         d_seq, lq_seq = self.queue_layer(x)  # (B,S,1)
-        α = d_seq.squeeze(-1) * lq_seq.squeeze(-1)  # crude inbound delay αᵢ
-        τ = torch.zeros_like(α).fill_(0.25)  # constant 15 min turnaround
-        c = α + torch.cat([τ[:, :-1], τ[:, :1]], 1) - τ  # (B,S)
 
-        δ_soft = self.maxplus(c)  # (B,S)
-        x_aug = torch.cat([x, δ_soft.unsqueeze(-1)], dim=2)  # extra feature
+        alpha = d_seq.squeeze(-1) * lq_seq.squeeze(-1)
+        tau = torch.zeros_like(alpha) + 0.25  # constant 15-min τ
+        c = alpha + torch.cat([tau[:, :-1], tau[:, :1]], 1) - tau
 
-        # continue with *parent* forward (which already has CNN→att→QMogrifier)
+        delta_soft = self.maxplus(c)  # (B,S)
+        x_aug = torch.cat([x, delta_soft.unsqueeze(-1)], dim=2)
+
         return super().forward(x_aug)
