@@ -85,9 +85,15 @@ def run_evaluation(
         else config.BEST_PARAMS_FILE
     )
     if best_file.exists():
-        arch_best = json.loads(best_file.read_text())
-        print(f"⤷ Loaded arch params from {best_file.name}")
-
+        try:
+            text = best_file.read_text().strip()
+            if text:
+                arch_best = json.loads(text)
+                print(f"✔ Loaded arch params from {best_file.name}")
+            else:
+                print(f"⚠ {best_file.name} is empty – ignored")
+        except json.JSONDecodeError:
+            print(f"⚠ {best_file.name} is not valid JSON – ignored")
     # 2) side-car meta (higher priority)
     meta_path = ckpt_path.with_suffix(".meta.json")
     if meta_path.exists():
