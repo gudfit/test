@@ -1,0 +1,1 @@
+python -m src.main --subsample 0.2 --model qtsimam --no-aug --lstm-bidir --skip-data 

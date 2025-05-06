@@ -106,3 +106,66 @@ class SimAM(torch.nn.Module):
 
         # sigmoid to get attention weights
         return x * self.activaton(e_inv)
+
+
+class MultiHeadSelfAttention1D(nn.Module):
+    """
+    Standard Transformer style self-attention for 1-D sequences.
+
+    Input  : (B, C_in, S)   – channels-first to stay consistent with Conv1d code
+    Output : (B, C_out, S)  – same length, possibly new channel dim
+
+    Arguments
+    ---------
+    embed_dim      : C_in  (will be split across heads)
+    num_heads      : number of attention heads
+    bias           : include bias terms in the QKV projections
+    out_dim        : optional projection dim; defaults to embed_dim
+    dropout        : dropout on the attention weights
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int = 8,
+        bias: bool = True,
+        out_dim: int | None = None,
+        dropout: float = 0.0,
+    ):
+        super().__init__()
+        assert (
+            embed_dim % num_heads == 0
+        ), f"embed_dim ({embed_dim}) must be divisible by num_heads ({num_heads})"
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim**-0.5
+        out_dim = out_dim or embed_dim
+
+        # In one projection for speed: (C_in) → (3·C_in)
+        self.qkv_proj = nn.Conv1d(embed_dim, 3 * embed_dim, kernel_size=1, bias=bias)
+        self.out_proj = nn.Conv1d(embed_dim, out_dim, kernel_size=1, bias=bias)
+        self.attn_drop = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B, C, S = x.shape  # (B,C,S)
+
+        # 1. project & reshape
+        qkv = self.qkv_proj(x)  # (B, 3C, S)
+        q, k, v = qkv.chunk(3, dim=1)  # each (B,C,S)
+
+        # (B, h, d_h, S)
+        q = q.view(B, self.num_heads, self.head_dim, S)
+        k = k.view(B, self.num_heads, self.head_dim, S)
+        v = v.view(B, self.num_heads, self.head_dim, S)
+
+        # 2. scaled dot-product attention
+        attn_scores = torch.einsum("b h d i, b h d j -> b h i j", q, k) * self.scale
+        attn_weights = F.softmax(attn_scores, dim=-1)
+        attn_weights = self.attn_drop(attn_weights)
+
+        ctx = torch.einsum("b h i j, b h d j -> b h d i", attn_weights, v)
+        ctx = ctx.reshape(B, self.embed_dim, S)  # (B,C,S)
+
+        # 3. project back to C_out
+        return self.out_proj(ctx)
