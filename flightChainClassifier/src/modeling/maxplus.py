@@ -31,10 +31,10 @@ class SoftMaxPlus(nn.Module):
         δ : (B, S)  propagated delay for each leg.
         """
         B, S = c.shape
-        δ_prev = c.new_zeros(B)  # δ₀ = 0
+        delta_prev = c.new_zeros(B)  # δ₀ = 0
         outs = []
         for i in range(S):
-            z = torch.stack([δ_prev, c[:, i] + δ_prev], dim=0)  # (2,B)
-            δ_prev = (1.0 / self.beta) * logsumexp(self.beta * z, dim=0)
-            outs.append(δ_prev.unsqueeze(1))
+            z = torch.stack([delta_prev, c[:, i] + delta_prev], dim=0)  # (2,B)
+            delta_prev = (1.0 / self.beta) * logsumexp(self.beta * z, dim=0)
+            outs.append(delta_prev.unsqueeze(1))
         return torch.cat(outs, dim=1)  # (B,S)

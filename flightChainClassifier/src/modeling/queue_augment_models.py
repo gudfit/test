@@ -9,9 +9,6 @@ from .maxplus import SoftMaxPlus
 from .. import config  # ← changed (for default flag)
 
 
-# ---------------------------------------------------------------------
-# 0. Residual-delay proxy (unchanged)
-# ---------------------------------------------------------------------
 class ResidualDelayLayer(nn.Module):
     def __init__(self, idx_distance: int, idx_airtime: int):
         super().__init__()
@@ -25,18 +22,15 @@ class ResidualDelayLayer(nn.Module):
         dist = x[:, :, self.idx_distance]
         air = x[:, :, self.idx_airtime]
         E_S = self.k_s * dist + self.eps
-        lam = (air + self.eps) / self.k_a
+        lam = self.k_a / (air + self.eps)
         rho = torch.clamp(lam * E_S, max=0.99)
-        W_q = rho / (1 - rho + self.eps) * E_S * 0.5
+        W_q = rho / (1 - rho + self.eps) * E_S
         Wn = (W_q - W_q.amin()) / (W_q.amax() - W_q.amin() + self.eps)
         L_q = lam * W_q
         Ln = (L_q - L_q.amin()) / (L_q.amax() - L_q.amin() + self.eps)
         return Wn.unsqueeze(-1), Ln.unsqueeze(-1)  # (B,S,1)
 
 
-# ---------------------------------------------------------------------
-# 1. Queue-augmented SimAM (unchanged)
-# ---------------------------------------------------------------------
 class QTSimAM(nn.Module):
     def __init__(self, e_lambda: float = 1e-4):
         super().__init__()
@@ -49,9 +43,6 @@ class QTSimAM(nn.Module):
         return x * self.sigmoid(e)
 
 
-# ---------------------------------------------------------------------
-# 2. QMogrifier cell & forward stack (unchanged)
-# ---------------------------------------------------------------------
 class QMogrifierCell(nn.Module):
     def __init__(self, input_size: int, hidden_size: int):
         super().__init__()
@@ -109,9 +100,6 @@ class BiQMogrifierStack(nn.Module):
         return None, h_concat
 
 
-# ---------------------------------------------------------------------
-# 4. Base QTSimAM CNN-LSTM model  (bidirectional flag added)
-# ---------------------------------------------------------------------
 class QTSimAM_CNN_LSTM_Model(nn.Module):
     def __init__(
         self,
