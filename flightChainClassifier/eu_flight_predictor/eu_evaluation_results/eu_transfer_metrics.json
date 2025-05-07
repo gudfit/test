@@ -1,0 +1,4 @@
+{
+    "accuracy": 0.826890461430493,
+    "classification_report": "                                    precision    recall  f1-score   support\n\nOn Time / Slight Delay (<= 15 min)     0.8439    0.9736    0.9041     13919\n               Delayed (15-60 min)     0.5956    0.1838    0.2809      3102\nSignificantly Delayed (60-120 min)     0.2206    0.2027    0.2113        74\n    Severely Delayed (120-240 min)     0.2000    0.7500    0.3158         4\n     Extremely Delayed (> 240 min)     0.0000    0.0000    0.0000         0\n\n                          accuracy                         0.8269     17099\n                         macro avg     0.3720    0.4220    0.3424     17099\n                      weighted avg     0.7960    0.8269    0.7879     17099\n"
+}
