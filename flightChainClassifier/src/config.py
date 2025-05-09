@@ -39,7 +39,6 @@ REQUIRED_RAW_COLS = [
     "ActualElapsedTime",
     "AirTime",
     "Distance",
-    "WeatherDelay",
 ]
 CHAIN_LENGTH = 3
 TARGET_COL_RAW = "ArrDelayMinutes"

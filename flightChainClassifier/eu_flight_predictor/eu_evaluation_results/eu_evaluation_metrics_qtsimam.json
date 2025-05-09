@@ -1,0 +1,86 @@
+{
+    "model_type": "qtsimam",
+    "accuracy": 0.8256038364816656,
+    "classification_report_dict": {
+        "On Time / Slight Delay (<= 15 min)": {
+            "precision": 0.846874606967677,
+            "recall": 0.9675264027588188,
+            "f1-score": 0.9031890278662688,
+            "support": 13919.0
+        },
+        "Delayed (15-60 min)": {
+            "precision": 0.5741410488245932,
+            "recall": 0.20470664087685364,
+            "f1-score": 0.3018060836501901,
+            "support": 3102.0
+        },
+        "Significantly Delayed (60-120 min)": {
+            "precision": 0.17073170731707318,
+            "recall": 0.1891891891891892,
+            "f1-score": 0.1794871794871795,
+            "support": 74.0
+        },
+        "Severely Delayed (120-240 min)": {
+            "precision": 0.14285714285714285,
+            "recall": 0.25,
+            "f1-score": 0.18181818181818182,
+            "support": 4.0
+        },
+        "Extremely Delayed (> 240 min)": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "accuracy": 0.8256038364816656,
+        "macro avg": {
+            "precision": 0.3469209011932972,
+            "recall": 0.32228444656497235,
+            "f1-score": 0.3132600945643641,
+            "support": 17099.0
+        },
+        "weighted avg": {
+            "precision": 0.7943060274138766,
+            "recall": 0.8256038364816656,
+            "f1-score": 0.7907889276778061,
+            "support": 17099.0
+        }
+    },
+    "confusion_matrix_list": [
+        [
+            13467,
+            422,
+            29,
+            1,
+            0
+        ],
+        [
+            2427,
+            635,
+            37,
+            3,
+            0
+        ],
+        [
+            8,
+            49,
+            14,
+            2,
+            1
+        ],
+        [
+            0,
+            0,
+            2,
+            1,
+            1
+        ],
+        [
+            0,
+            0,
+            0,
+            0,
+            0
+        ]
+    ]
+}

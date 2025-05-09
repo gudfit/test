@@ -5,19 +5,22 @@ import os
 
 # Import specific variables needed from eu_config
 from eu_config import (
-    EU_RAW_DATA_DIR,
-    MERGED_EU_DATA_FILE,
+    EU_INDIVIDUAL_CLEANED_CSVS_DIR,  # This is what we need for the source
+    MERGED_EU_DATA_FILE,  # This is the output file path
     EU_COLUMN_MAPPING_RAW,
-    TARGET_COL_INTERNAL_NAME,  # <--- IMPORT THIS
+    TARGET_COL_INTERNAL_NAME,
 )
 
 
 def merge_eu_flight_data():
     """Merges all cleaned EU flight CSVs into a single file."""
-    csv_files = glob.glob(os.path.join(EU_RAW_DATA_DIR, "cleaned_Flights_*.csv"))
+
+    csv_files = glob.glob(
+        os.path.join(EU_INDIVIDUAL_CLEANED_CSVS_DIR, "cleaned_Flights_*.csv")
+    )
     if not csv_files:
         print(
-            f"No CSV files found in {EU_RAW_DATA_DIR}. Please check the path and filenames."
+            f"No CSV files found in {EU_INDIVIDUAL_CLEANED_CSVS_DIR}. Please check the path and filenames."
         )
         return
 
@@ -37,9 +40,6 @@ def merge_eu_flight_data():
     merged_df = pd.concat(df_list, ignore_index=True)
     print(f"Merged dataframe shape: {merged_df.shape}")
 
-    # Basic check: Ensure target column exists after merge
-    # TARGET_COL_INTERNAL_NAME is "ArrDelayMinutes" (or whatever you set it to in eu_config.py)
-    # EU_COLUMN_MAPPING_RAW maps this internal name to the actual CSV column name.
     target_internal_name_for_check = TARGET_COL_INTERNAL_NAME
     target_csv_name_from_mapping = EU_COLUMN_MAPPING_RAW.get(
         target_internal_name_for_check
@@ -54,15 +54,18 @@ def merge_eu_flight_data():
         )
         print(f"Available columns in merged data: {merged_df.columns.tolist()}")
     elif not target_csv_name_from_mapping:
-        # This case means TARGET_COL_INTERNAL_NAME itself is not a key in EU_COLUMN_MAPPING_RAW
         print(
             f"WARNING: The internal target column name '{target_internal_name_for_check}' is not mapped to an actual CSV column name in EU_COLUMN_MAPPING_RAW (in eu_config.py)."
         )
     else:
-        # This means the mapping exists and the CSV column name is found in merged_df.columns
         print(
             f"Target column check: Internal name '{target_internal_name_for_check}' maps to CSV column '{target_csv_name_from_mapping}', which is present in merged data."
         )
+
+    # Ensure the directory for the merged file exists
+    # MERGED_EU_DATA_FILE already contains the full path including the directory from eu_config.py
+    output_dir_for_merged_file = os.path.dirname(MERGED_EU_DATA_FILE)
+    os.makedirs(output_dir_for_merged_file, exist_ok=True)
 
     merged_df.to_csv(MERGED_EU_DATA_FILE, index=False)
     print(f"Successfully merged EU data to {MERGED_EU_DATA_FILE}")

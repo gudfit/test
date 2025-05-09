@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import torch.nn.functional as F
 from tqdm import tqdm
+import traceback  # For detailed error printing
 
 from eu_config import (
     DEVICE,
@@ -18,23 +19,14 @@ from eu_config import (
     PROCESSED_EU_CHAINS_DIR,
     load_original_data_stats_for_scaling,
     load_model_hyperparameters,
-    MAIN_PROJECT_ROOT,  # Used for constructing the sys.path entry
-    # Placeholder: Assume EU_PREDICTION_MODEL_TYPE is defined in eu_config.py
-    # e.g., EU_PREDICTION_MODEL_TYPE = "qtsimam" # "cbam", "simam", "qtsimam", "qtsimam_mp"
+    MAIN_PROJECT_ROOT,
+    EU_PREDICTION_MODEL_TYPE,  # Import the selected model type
+    FORCE_LSTM_BIDIR_FOR_EU,  # Import the override flag <<<<<<<<<<< IMPORTED
+    DELAY_STATUS_MAP_EU,  # Now imported from eu_config
+    UNKNOWN_STATUS_EU,  # Now imported from eu_config
 )
 
-# Try to import EU_PREDICTION_MODEL_TYPE, with a default if not found (for robustness)
-try:
-    from eu_config import EU_PREDICTION_MODEL_TYPE
-except ImportError:
-    print(
-        "Warning: EU_PREDICTION_MODEL_TYPE not found in eu_config.py. Defaulting to 'qtsimam'."
-    )
-    EU_PREDICTION_MODEL_TYPE = "qtsimam"
-
-
 # Dynamically add the parent of 'src' (i.e., flightChainClassifier directory) to sys.path
-# MAIN_PROJECT_ROOT from eu_config.py is /.../flightChainClassifier
 flight_classifier_project_dir_for_sys_path = MAIN_PROJECT_ROOT
 if str(flight_classifier_project_dir_for_sys_path) not in sys.path:
     sys.path.insert(0, str(flight_classifier_project_dir_for_sys_path))
@@ -42,17 +34,32 @@ if str(flight_classifier_project_dir_for_sys_path) not in sys.path:
         f"DEBUG: Added to sys.path for import: {flight_classifier_project_dir_for_sys_path}"
     )
 
+# Import project structure from main project to get defaults if needed
+# This is needed if fallbacks rely on main project's config.py
 try:
-    # Now import as if 'src' is a package within flightChainClassifier
+    # Attempt to import the main project's config
+    from src import config as main_project_config
+
+    print(f"DEBUG: Successfully imported main project config from src.config")
+except ImportError:
+    main_project_config = None
+    print(
+        "Warning: Could not import main project config (src.config). Fallbacks might use hardcoded values."
+    )
+except Exception as e:
+    main_project_config = None
+    print(f"Warning: An error occurred while importing main project config: {e}")
+
+
+try:
+    # Import all potential model classes
     from src.modeling.flight_chain_models import CBAM_CNN_Model, SimAM_CNN_LSTM_Model
     from src.modeling.queue_augment_models import (
         QTSimAM_CNN_LSTM_Model,
         QTSimAM_MaxPlus_Model,
     )
 
-    print(
-        f"DEBUG: Successfully imported CBAM_CNN_Model, SimAM_CNN_LSTM_Model, QTSimAM_CNN_LSTM_Model, QTSimAM_MaxPlus_Model using 'from src.modeling...'"
-    )
+    print(f"DEBUG: Successfully imported models using 'from src.modeling...'")
 except ImportError as e:
     print(
         f"ERROR: Could not import one or more models using 'from src.modeling...'. Error: {e}"
@@ -64,29 +71,14 @@ except ImportError as e:
     print(
         "Ensure this path correctly points to your 'flightChainClassifier' project directory, which contains the 'src' sub-package."
     )
-    print(
-        "Also check for typos in the module paths 'src.modeling.flight_chain_models', 'src.modeling.queue_augment_models' or class names."
-    )
     sys.exit(1)
 except ModuleNotFoundError as mnfe:
     print(f"ERROR: ModuleNotFoundError while trying to import models. Error: {mnfe}")
-    print(
-        f"This usually means a submodule (e.g., 'src' or 'src.modeling') is missing or not on the path correctly."
-    )
-    print(
-        f"Attempted import after adding '{flight_classifier_project_dir_for_sys_path}' to sys.path. Please verify its contents and __init__.py files."
-    )
     sys.exit(1)
-
-
-DELAY_STATUS_MAP_EU = {
-    0: "On Time / Slight Delay (<= 15 min)",
-    1: "Delayed (15-60 min)",
-    2: "Significantly Delayed (60-120 min)",
-    3: "Severely Delayed (120-240 min)",
-    4: "Extremely Delayed (> 240 min)",
-}
-UNKNOWN_STATUS_EU = "Unknown Delay Status"
+except Exception as e:
+    print(f"An unexpected error occurred during model imports: {e}")
+    traceback.print_exc()
+    sys.exit(1)
 
 
 class EUPredictor:
@@ -99,7 +91,7 @@ class EUPredictor:
 
         if not self.original_data_stats:
             raise ValueError(
-                "Failed to load original data stats (from flightChainClassifier training). These are required for feature count."
+                "Failed to load original data stats required for feature count."
             )
 
         self._load_model()
@@ -107,59 +99,71 @@ class EUPredictor:
     def _load_model(self):
         if not MODEL_PATH_FOR_EU_PREDICTION.exists():
             raise FileNotFoundError(
-                f"Pre-trained model (.pt file) not found at the configured path: {MODEL_PATH_FOR_EU_PREDICTION}"
+                f"Pre-trained model not found: {MODEL_PATH_FOR_EU_PREDICTION}"
             )
 
         num_features_from_stats = self.original_data_stats.get("num_features")
         if num_features_from_stats is None:
-            raise ValueError(
-                "'num_features' key missing from original data stats (data_stats.json). This is required for model initialization."
-            )
+            raise ValueError("'num_features' missing from original data stats.")
 
-        # Fallback hyperparameter values
-        fallback_cnn_channels = [64, 128, 256]
-        fallback_kernel_size = 3
-        fallback_lstm_hidden = 128  # For LSTM-based models
-        fallback_lstm_layers = 1  # For LSTM-based models
-        fallback_lstm_bidir = False  # For LSTM-based models
-        fallback_dropout_rate = 0.2
-        fallback_attn_heads = 4  # For models using MultiHeadSelfAttention1D
+        # --- Determine Hyperparameters (with fallbacks and overrides) ---
 
-        # Initialize with fallbacks
+        # Get defaults from main project config if available, else hardcode
+        fallback_cnn_channels = getattr(
+            main_project_config, "DEFAULT_CNN_CHANNELS", [64, 128, 256]
+        )
+        fallback_kernel_size = getattr(main_project_config, "DEFAULT_KERNEL_SIZE", 3)
+        fallback_lstm_hidden = getattr(
+            main_project_config, "DEFAULT_LSTM_HIDDEN_SIZE", 128
+        )
+        fallback_lstm_layers = getattr(
+            main_project_config, "DEFAULT_LSTM_NUM_LAYERS", 1
+        )
+        # Default if nothing else specifies bidirectional setting
+        fallback_lstm_bidir_default = getattr(
+            main_project_config, "DEFAULT_LSTM_BIDIRECTIONAL", False
+        )
+        fallback_dropout_rate = getattr(
+            main_project_config, "DEFAULT_DROPOUT_RATE", 0.2
+        )
+        fallback_attn_heads = 4  # Not typically in main config, use fallback
+
+        # Load from hyperparams file if available
+        loaded_params_source = "main project defaults or hardcoded fallbacks"
         cnn_channels = fallback_cnn_channels
         kernel_size = fallback_kernel_size
         lstm_hidden = fallback_lstm_hidden
         lstm_layers = fallback_lstm_layers
-        lstm_bidir = fallback_lstm_bidir
+        # Start with default for bidir, check hyperparams later
+        lstm_bidir_from_params = fallback_lstm_bidir_default
         dropout_rate = fallback_dropout_rate
         attn_heads = fallback_attn_heads
-
-        loaded_params_source = "fallback defaults"
 
         if self.model_hyperparams:
             loaded_params_source = "loaded file"
             print(
                 f"DEBUG: Using model_hyperparams loaded by eu_config: {self.model_hyperparams}"
             )
-
             cnn_channels = self.model_hyperparams.get(
                 "cnn_channels", fallback_cnn_channels
             )
             kernel_size = self.model_hyperparams.get(
                 "kernel_size", fallback_kernel_size
             )
-            # For LSTM/QMogrifier specific params
             lstm_hidden = self.model_hyperparams.get(
-                "lstm_hidden_size",  # Optuna key
+                "lstm_hidden_size",
                 self.model_hyperparams.get("lstm_hidden", fallback_lstm_hidden),
-            )  # Model constructor key
+            )
             lstm_layers = self.model_hyperparams.get(
-                "lstm_num_layers",  # Optuna key
+                "lstm_num_layers",
                 self.model_hyperparams.get("lstm_layers", fallback_lstm_layers),
-            )  # Model constructor key
-            lstm_bidir = self.model_hyperparams.get(
+            )
+            # Check for bidirectional flag in loaded params (check both possible keys)
+            lstm_bidir_from_params = self.model_hyperparams.get(
                 "lstm_bidir",
-                self.model_hyperparams.get("lstm_bidirectional", fallback_lstm_bidir),
+                self.model_hyperparams.get(
+                    "lstm_bidirectional", fallback_lstm_bidir_default
+                ),
             )
             dropout_rate = self.model_hyperparams.get(
                 "dropout_rate",
@@ -168,15 +172,34 @@ class EUPredictor:
             attn_heads = self.model_hyperparams.get("attn_heads", fallback_attn_heads)
         else:
             print(
-                f"Warning: Model hyperparameters file not found or failed to load. Using fallback defaults for {self.model_type_to_load} model architecture."
+                f"Warning: Model hyperparameters file not found or failed to load. Using defaults for {self.model_type_to_load} model architecture."
             )
+
+        # --- Override Bidirectional based on FORCE flag from eu_config.py --- <<<<<< LOGIC ADDED
+        if FORCE_LSTM_BIDIR_FOR_EU is True:
+            final_lstm_bidir = True
+            print(
+                f"INFO: Overriding LSTM bidirectional setting to True based on FORCE_LSTM_BIDIR_FOR_EU flag in eu_config."
+            )
+        elif FORCE_LSTM_BIDIR_FOR_EU is False:
+            final_lstm_bidir = False
+            print(
+                f"INFO: Overriding LSTM bidirectional setting to False based on FORCE_LSTM_BIDIR_FOR_EU flag in eu_config."
+            )
+        else:  # FORCE_LSTM_BIDIR_FOR_EU is None
+            final_lstm_bidir = lstm_bidir_from_params  # Use value derived from hyperparams file or default
+            print(
+                f"INFO: Using LSTM bidirectional setting from loaded params or default: lstm_bidir = {final_lstm_bidir} (FORCE_LSTM_BIDIR_FOR_EU is None)."
+            )
+        # --- End Override Logic ---
 
         print(
             f"Initializing {self.model_type_to_load.upper()} model with parameters (source: {loaded_params_source}):"
         )
 
-        # Model-specific instantiation
+        # --- Model-specific instantiation using FINAL values ---
         if self.model_type_to_load == "cbam":
+            # CBAM doesn't use LSTM params
             print(
                 f"  num_features={num_features_from_stats}, num_classes={NUM_CLASSES_CLASSIFICATION}"
             )
@@ -196,8 +219,8 @@ class EUPredictor:
             )
             print(f"  cnn_channels={cnn_channels}, kernel_size={kernel_size}")
             print(
-                f"  lstm_hidden={lstm_hidden}, lstm_layers={lstm_layers}, lstm_bidir={lstm_bidir}"
-            )
+                f"  lstm_hidden={lstm_hidden}, lstm_layers={lstm_layers}, lstm_bidir={final_lstm_bidir}"
+            )  # Use final_lstm_bidir
             print(f"  dropout_rate={dropout_rate}, attn_heads={attn_heads}")
             self.model = SimAM_CNN_LSTM_Model(
                 num_features=num_features_from_stats,
@@ -206,7 +229,7 @@ class EUPredictor:
                 kernel_size=kernel_size,
                 lstm_hidden=lstm_hidden,
                 lstm_layers=lstm_layers,
-                lstm_bidir=lstm_bidir,
+                lstm_bidir=final_lstm_bidir,  # Pass the FINAL determined value <<<<<<< MODIFIED
                 dropout_rate=dropout_rate,
                 attn_heads=attn_heads,
             )
@@ -216,8 +239,8 @@ class EUPredictor:
             )
             print(f"  cnn_channels={cnn_channels}, kernel_size={kernel_size}")
             print(
-                f"  lstm_hidden={lstm_hidden}, lstm_layers={lstm_layers}, lstm_bidir={lstm_bidir}"
-            )
+                f"  lstm_hidden={lstm_hidden}, lstm_layers={lstm_layers}, lstm_bidir={final_lstm_bidir}"
+            )  # Use final_lstm_bidir
             print(f"  dropout_rate={dropout_rate}, attn_heads={attn_heads}")
             self.model = QTSimAM_CNN_LSTM_Model(
                 num_features=num_features_from_stats,
@@ -226,12 +249,11 @@ class EUPredictor:
                 kernel_size=kernel_size,
                 lstm_hidden=lstm_hidden,
                 lstm_layers=lstm_layers,
-                lstm_bidir=lstm_bidir,
+                lstm_bidir=final_lstm_bidir,  # Pass the FINAL determined value <<<<<<< MODIFIED
                 dropout_rate=dropout_rate,
                 attn_heads=attn_heads,
             )
         elif self.model_type_to_load == "qtsimam_mp":
-            # QTSimAM_MaxPlus_Model augments one feature internally
             num_features_for_constructor = num_features_from_stats + 1
             print(
                 f"  num_features_from_stats={num_features_from_stats} -> num_features_for_constructor={num_features_for_constructor} (for QTSimAM_MaxPlus internal augmentation)"
@@ -239,20 +261,19 @@ class EUPredictor:
             print(f"  num_classes={NUM_CLASSES_CLASSIFICATION}")
             print(f"  cnn_channels={cnn_channels}, kernel_size={kernel_size}")
             print(
-                f"  lstm_hidden={lstm_hidden}, lstm_layers={lstm_layers}, lstm_bidir={lstm_bidir}"
-            )
+                f"  lstm_hidden={lstm_hidden}, lstm_layers={lstm_layers}, lstm_bidir={final_lstm_bidir}"
+            )  # Use final_lstm_bidir
             print(f"  dropout_rate={dropout_rate}, attn_heads={attn_heads}")
             self.model = QTSimAM_MaxPlus_Model(
-                num_features=num_features_for_constructor,  # This is num_features AFTER internal augmentation
+                num_features=num_features_for_constructor,
                 num_classes=NUM_CLASSES_CLASSIFICATION,
                 cnn_channels=cnn_channels,
                 kernel_size=kernel_size,
                 lstm_hidden=lstm_hidden,
                 lstm_layers=lstm_layers,
-                lstm_bidir=lstm_bidir,
+                lstm_bidir=final_lstm_bidir,  # Pass the FINAL determined value <<<<<<< MODIFIED
                 dropout_rate=dropout_rate,
                 attn_heads=attn_heads,
-                # beta for SoftMaxPlus will use its default if not in hyperparams
                 beta=(
                     self.model_hyperparams.get("beta", 10.0)
                     if self.model_hyperparams
@@ -261,10 +282,10 @@ class EUPredictor:
             )
         else:
             raise ValueError(
-                f"Unsupported EU_PREDICTION_MODEL_TYPE: '{self.model_type_to_load}'. "
-                "Supported types: 'cbam', 'simam', 'qtsimam', 'qtsimam_mp'."
+                f"Unsupported EU_PREDICTION_MODEL_TYPE: '{self.model_type_to_load}'."
             )
 
+        # --- Load State Dict ---
         try:
             print(
                 f"Loading model state_dict into {self.model.__class__.__name__} from {MODEL_PATH_FOR_EU_PREDICTION}..."
@@ -280,19 +301,34 @@ class EUPredictor:
             print(
                 "This very often indicates a mismatch between the loaded model's saved architecture and the architecture defined by the current parameters used for initialization."
             )
+            print("Current Initialization Parameters:")
+            print(f"  Model Type Instantiated: {self.model_type_to_load.upper()}")
+            # Explicitly print the final_lstm_bidir value that was used
+            print(f"  LSTM Bidirectional Used for Instantiation: {final_lstm_bidir}")
+            print(f"  Other Params: (See printout above)")
             print(
-                f"Please ensure the parameters printed above precisely match the parameters of the model saved at: {MODEL_PATH_FOR_EU_PREDICTION}"
+                f"Please ensure these parameters (especially lstm_bidir={final_lstm_bidir}) precisely match the parameters of the model saved at: {MODEL_PATH_FOR_EU_PREDICTION}"
             )
             meta_file_to_check = MODEL_PATH_FOR_EU_PREDICTION.with_suffix(".meta.json")
+            # Construct potential specific hyperparam filename based on type used for instantiation
             hyperparam_file_to_check = (
                 MAIN_PROJECT_ROOT
                 / "results"
                 / f"best_hyperparameters_{self.model_type_to_load}.json"
             )
             print(
-                f"RECOMMENDATION: Compare with the .meta.json file (path: {meta_file_to_check}) "
-                f"or the specific hyperparameter file (e.g., {hyperparam_file_to_check} if that was used for training this model)."
+                f"RECOMMENDATION: Check the contents of {meta_file_to_check} or {hyperparam_file_to_check} (if it exists) to confirm the architecture of the saved model."
             )
+            print(
+                f"Current FORCE_LSTM_BIDIR_FOR_EU setting in eu_config.py is: {FORCE_LSTM_BIDIR_FOR_EU}"
+            )
+            sys.exit(1)
+        except FileNotFoundError:  # Should have been caught earlier, but good practice
+            print(f"ERROR: Model file not found at {MODEL_PATH_FOR_EU_PREDICTION}")
+            sys.exit(1)
+        except Exception as e:  # Catch other potential errors during loading
+            print(f"An unexpected error occurred during model state_dict loading: {e}")
+            traceback.print_exc()
             sys.exit(1)
 
         self.model.to(self.device)
@@ -343,11 +379,12 @@ class EUPredictor:
             f"Predicting on {len(eu_chains_np)} EU flight chains using {self.model.__class__.__name__}..."
         )
         all_predictions_indices, all_probabilities_np = [], []
-        batch_size = 64  # You might want to make this configurable
+        batch_size = 64  # Consider making this configurable
         for i in tqdm(
             range(0, len(eu_chains_np), batch_size),
             desc="Batch Prediction",
             unit="batch",
+            ncols=100,  # Nicer progress bar width
         ):
             batch_chains_np = eu_chains_np[i : i + batch_size]
             batch_chains_tensor = torch.tensor(batch_chains_np, dtype=torch.float32).to(
@@ -375,9 +412,12 @@ class EUPredictor:
 def run_eu_prediction():
     print("--- Starting EU Flight Chain Prediction ---")
     print(f"Using model type: {EU_PREDICTION_MODEL_TYPE.upper()}")
+    # Also print the status of the force flag for clarity
+    print(f"Force BiLSTM override active in config: {FORCE_LSTM_BIDIR_FOR_EU}")
+
     if not EU_TEST_CHAINS_FILE.exists():
         print(
-            f"Processed EU chains file {EU_TEST_CHAINS_FILE} not found. Run 'eu_chain_constructor.py' first to generate it."
+            f"Processed EU chains file {EU_TEST_CHAINS_FILE} not found. Run 'eu_chain_constructor.py' first."
         )
         sys.exit(1)
 
@@ -385,8 +425,6 @@ def run_eu_prediction():
         predictor = EUPredictor()
     except Exception as e:
         print(f"FATAL: Failed to initialize EUPredictor: {e}")
-        import traceback
-
         traceback.print_exc()
         return None, None, None
 
@@ -402,11 +440,7 @@ def run_eu_prediction():
         print(
             "No predictions were made (e.g., input chains file was empty or processing issue)."
         )
-        return (
-            np.array([]),
-            np.array([]),
-            None,
-        )  # Return empty arrays and None for labels
+        return np.array([]), np.array([]), None
 
     predicted_statuses = [
         DELAY_STATUS_MAP_EU.get(idx, UNKNOWN_STATUS_EU)
@@ -429,12 +463,11 @@ def run_eu_prediction():
                 print(
                     f"Warning: Length mismatch between true labels ({len(true_labels_np)}) and predictions ({len(predicted_category_indices)}). Evaluation might be affected."
                 )
-                # Potentially truncate or pad if necessary, or just warn. For now, just warn.
         except Exception as e:
             print(
                 f"Warning: Could not load true labels file {EU_TEST_LABELS_FILE}: {e}"
             )
-            true_labels_np = None  # Ensure it's None if loading fails
+            true_labels_np = None
     else:
         print(
             f"True labels file {EU_TEST_LABELS_FILE} not found. Full evaluation against true labels not possible here."
@@ -448,10 +481,8 @@ if __name__ == "__main__":
     predicted_indices, probabilities, true_labels = run_eu_prediction()
 
     if predicted_indices is not None and len(predicted_indices) > 0:
-        # Ensure the output directory exists
         PROCESSED_EU_CHAINS_DIR.mkdir(parents=True, exist_ok=True)
-
-        # Save predicted indices
+        # Construct filenames using the model type
         output_pred_indices_path = (
             PROCESSED_EU_CHAINS_DIR
             / f"eu_predicted_indices_{EU_PREDICTION_MODEL_TYPE}.npy"
@@ -459,7 +490,6 @@ if __name__ == "__main__":
         np.save(output_pred_indices_path, predicted_indices)
         print(f"Predicted indices saved to {output_pred_indices_path}")
 
-        # Save predicted probabilities if available
         if probabilities is not None and len(probabilities) > 0:
             output_pred_probs_path = (
                 PROCESSED_EU_CHAINS_DIR
@@ -467,15 +497,13 @@ if __name__ == "__main__":
             )
             np.save(output_pred_probs_path, probabilities)
             print(f"Predicted probabilities saved to {output_pred_probs_path}")
+        else:
+            print("Predicted probabilities were not generated or returned.")
 
         print(
-            "You can now run 'eu_evaluate_predictions.py' if true labels are available and were loaded."
+            "You can now run 'eu_ev.py' (or 'eu_evaluate_predictions.py') if true labels are available and were loaded."
         )
-    elif (
-        predicted_indices is not None and len(predicted_indices) == 0
-    ):  # Case: Prediction ran, but no items to predict
-        print(
-            "Prediction ran, but no chains resulted in predictions (e.g., empty input file)."
-        )
-    else:  # Case: Prediction failed critically (predicted_indices is None)
+    elif predicted_indices is not None and len(predicted_indices) == 0:
+        print("Prediction ran, but no chains resulted in predictions.")
+    else:
         print("Prediction script did not produce valid output.")

@@ -1,0 +1,17 @@
+{
+    "num_features": 12,
+    "feature_names_order": [
+        "DepDelayMinutes",
+        "CRSElapsedTime",
+        "ActualElapsedTime",
+        "AirTime",
+        "Distance",
+        "Month",
+        "DayOfMonth",
+        "DayOfWeek",
+        "Hour",
+        "Reporting_Airline",
+        "Origin",
+        "Dest"
+    ]
+}
