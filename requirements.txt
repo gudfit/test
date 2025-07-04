@@ -1,0 +1,11 @@
+transformers
+torch
+spacy
+datasets
+accelerate
+torchac
+nltk
+evaluate
+scikit-learn
+tqdm
+packaging
