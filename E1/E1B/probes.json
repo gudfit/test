@@ -1,0 +1,82 @@
+[
+    {
+        "template": "The pen is mightier [MASK] the sword, communication is key",
+        "answer": "than"
+    },
+    {
+        "template": "Don't put the cart before the [MASK] do things in order",
+        "answer": "horse"
+    },
+    {
+        "template": "Where there's [MASK] there's fire, trust your instincts",
+        "answer": "smoke"
+    },
+    {
+        "template": "The grass is always [MASK] on the other side",
+        "answer": "greener"
+    },
+    {
+        "template": "When the going [MASK] tough, the tough get going",
+        "answer": "gets"
+    },
+    {
+        "template": "A watched [MASK] never boils, be patient and give it time",
+        "answer": "pot"
+    },
+    {
+        "template": "Every cloud has a silver [MASK] keep looking up",
+        "answer": "lining"
+    },
+    {
+        "template": "Rome [MASK] built in a day, patience is key",
+        "answer": "wasn't"
+    },
+    {
+        "template": "Don't count your [MASK] before they hatch, avoid assumptions",
+        "answer": "chickens"
+    },
+    {
+        "template": "The apple doesn't fall far from the tree, [MASK] parent like child",
+        "answer": "like"
+    },
+    {
+        "template": "Absence makes the heart grow fonder, [MASK] can be good",
+        "answer": "distance"
+    },
+    {
+        "template": "Birds [MASK] a feather flock together, find like-minded people",
+        "answer": "of"
+    },
+    {
+        "template": "All work and no [MASK] makes Jack a dull boy",
+        "answer": "play"
+    },
+    {
+        "template": "Don't bite the hand [MASK] feeds you, show some gratitude",
+        "answer": "that"
+    },
+    {
+        "template": "The proof of the pudding [MASK] in the eating",
+        "answer": "is"
+    },
+    {
+        "template": "If it ain't broke, [MASK] fix it, leave well enough alone",
+        "answer": "don't"
+    },
+    {
+        "template": "A stitch in time saves [MASK] take care of problems promptly",
+        "answer": "nine"
+    },
+    {
+        "template": "Beggars can't be [MASK] take what you can get",
+        "answer": "choosers"
+    },
+    {
+        "template": "The proof is in the [MASK] results matter most",
+        "answer": "pudding"
+    },
+    {
+        "template": "Birds of a feather flock together, find [MASK] tribe",
+        "answer": "your"
+    }
+]
