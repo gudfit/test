@@ -49,7 +49,8 @@ def train_decoder(args):
                 max_length=512,
             ).to(device)
             with torch.no_grad():
-                outputs = encoder.bert(
+                base_model = getattr(encoder, encoder.config.model_type)
+                outputs = base_model(
                     inputs.input_ids, attention_mask=inputs.attention_mask
                 )
                 latent_states = outputs[0]
@@ -83,8 +84,9 @@ def train_decoder(args):
                     truncation=True,
                     max_length=512,
                 ).to(device)
-                outputs = encoder.bert(
-                    inputs.input_ids, attention_mask=inputs.attention_mask
+                base_model = getattr(encoder, encoder.config.model_type)
+                outputs = base_model(
+                  inputs.input_ids, attention_mask=inputs.attention_mask
                 )
                 latent_states = outputs[0]
                 scale = (latent_states.max() - latent_states.min()) / 255
@@ -130,7 +132,8 @@ def evaluate(args):
             text, return_tensors="pt", padding=True, truncation=True, max_length=512
         ).to(device)
         with torch.no_grad():
-            outputs = encoder.bert(inputs.input_ids)
+            base_model = getattr(encoder, encoder.config.model_type)
+            outputs = base_model(inputs.input_ids)
             latent_states = outputs[0]
 
         scale = (latent_states.max() - latent_states.min()) / 255

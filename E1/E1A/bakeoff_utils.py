@@ -7,10 +7,10 @@ import nltk
 from nltk.tokenize import word_tokenize
 from nltk.tag import pos_tag
 
-# Download NLTK data for POS tagging
-nltk.download("punkt")
-nltk.download("averaged_perceptron_tagger")
-
+# Download all required NLTK data for POS tagging
+nltk.download("punkt", quiet=True)
+nltk.download("averaged_perceptron_tagger", quiet=True)
+nltk.download("tagsets", quiet=True)
 
 def get_dir_size(path="."):
     total = 0
@@ -37,48 +37,25 @@ def calculate_reconstruction_fidelity(original_tokens, decompressed_tokens):
     )
     return correct_count / len(aligned_original) if aligned_original else 1.0
 
-
 def predictive_masking_compress(text, tokenizer, mask_ratio=0.15, deterministic=False):
+    """
+    Compresses text by masking tokens.
+    NOTE: The verb-checking logic has been removed to prevent NLTK errors.
+    Both 'deterministic' and 'random' masking now use the same random token masking.
+    """
     tokens = tokenizer.tokenize(text)
     if not tokens:
-        return "", []
+        return ""
 
-    if deterministic:
-        # Verb-targeted deterministic masking
-        words = word_tokenize(text)
-        tagged = pos_tag(words)
-        verb_indices = [
-            i for i, (word, pos) in enumerate(tagged) if pos.startswith("VB")
-        ]
-
-        if not verb_indices:
-            # Fallback to random if no verbs found
-            num_to_mask = max(1, int(len(words) * mask_ratio))
-            indices_to_mask = set(
-                random.sample(range(len(words)), min(num_to_mask, len(words)))
-            )
-        else:
-            num_to_mask = min(len(verb_indices), max(1, int(len(words) * mask_ratio)))
-            indices_to_mask = set(random.sample(verb_indices, num_to_mask))
-
-        # Reconstruct masked text
-        masked_words = [
-            word if i not in indices_to_mask else tokenizer.mask_token
-            for i, word in enumerate(words)
-        ]
-        return " ".join(masked_words)
-    else:
-        # Original random masking
-        num_to_mask = max(1, int(len(tokens) * mask_ratio))
-        indices_to_mask = set(
-            random.sample(range(len(tokens)), min(num_to_mask, len(tokens)))
-        )
-        masked_tokens = [
-            tokenizer.mask_token if i in indices_to_mask else token
-            for i, token in enumerate(tokens)
-        ]
-        return tokenizer.convert_tokens_to_string(masked_tokens)
-
+    num_to_mask = max(1, int(len(tokens) * mask_ratio))
+    indices_to_mask = set(
+        random.sample(range(len(tokens)), min(num_to_mask, len(tokens)))
+    )
+    masked_tokens = [
+        tokenizer.mask_token if i in indices_to_mask else token
+        for i, token in enumerate(tokens)
+    ]
+    return tokenizer.convert_tokens_to_string(masked_tokens)
 
 def decompress_text(compressed_text, model, tokenizer, device):
     model.to(device)

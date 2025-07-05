@@ -1,0 +1,5 @@
+E1/E1A/models/
+*.pth
+*.bin
+*.safetensors
+training_output/

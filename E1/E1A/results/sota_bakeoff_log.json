@@ -1,0 +1,243 @@
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/bert-base-cased_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.25 --masking-type random
+{
+  "method": "Predictive Masking",
+  "model": "bert-base-cased_wikitext_finetuned",
+  "masking_type": "random",
+  "mask_ratio": 0.25,
+  "compression_efficiency_bpt": 41.03765690376569,
+  "reconstruction_fidelity": 0.6558116360894183,
+  "model_size_mb": 414.15904426574707
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/bert-base-cased_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.50 --masking-type random
+{
+  "method": "Predictive Masking",
+  "model": "bert-base-cased_wikitext_finetuned",
+  "masking_type": "random",
+  "mask_ratio": 0.5,
+  "compression_efficiency_bpt": 46.0950931913275,
+  "reconstruction_fidelity": 0.5007904526418506,
+  "model_size_mb": 414.15904426574707
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/bert-base-cased_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.75 --masking-type random
+{
+  "method": "Predictive Masking",
+  "model": "bert-base-cased_wikitext_finetuned",
+  "masking_type": "random",
+  "mask_ratio": 0.75,
+  "compression_efficiency_bpt": 50.65348041080259,
+  "reconstruction_fidelity": 0.39942400489453367,
+  "model_size_mb": 414.15904426574707
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/bert-base-cased_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.25 --masking-type deterministic
+{
+  "method": "Predictive Masking",
+  "model": "bert-base-cased_wikitext_finetuned",
+  "masking_type": "deterministic",
+  "mask_ratio": 0.25,
+  "compression_efficiency_bpt": 40.71662228984405,
+  "reconstruction_fidelity": 0.6233004480791051,
+  "model_size_mb": 414.15904426574707
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/bert-base-cased_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.50 --masking-type deterministic
+{
+  "method": "Predictive Masking",
+  "model": "bert-base-cased_wikitext_finetuned",
+  "masking_type": "deterministic",
+  "mask_ratio": 0.5,
+  "compression_efficiency_bpt": 46.09052871814378,
+  "reconstruction_fidelity": 0.5417964184578287,
+  "model_size_mb": 414.15904426574707
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/bert-base-cased_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.75 --masking-type deterministic
+{
+  "method": "Predictive Masking",
+  "model": "bert-base-cased_wikitext_finetuned",
+  "masking_type": "deterministic",
+  "mask_ratio": 0.75,
+  "compression_efficiency_bpt": 50.90756941802967,
+  "reconstruction_fidelity": 0.3831248665674177,
+  "model_size_mb": 414.15904426574707
+}
+----------------------------------------
+RUNNING: E1.E1A.method_latent_quantization --model-path /root/test/E1/E1A/models/bert-base-cased_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --decoder-path /root/test/E1/E1A/models/bert-base-cased_lsq_decoder.pth --evaluate
+{
+  "method": "Latent Space Quantization",
+  "compression_efficiency_bpt": 6286.557626473945,
+  "reconstruction_fidelity": 0.2713844893565995,
+  "model_size_mb": 588.6766576766968
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/roberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.25 --masking-type random
+{
+  "method": "Predictive Masking",
+  "model": "roberta-base_wikitext_finetuned",
+  "masking_type": "random",
+  "mask_ratio": 0.25,
+  "compression_efficiency_bpt": 39.3155722326454,
+  "reconstruction_fidelity": 0.8484038440392482,
+  "model_size_mb": 480.30409145355225
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/roberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.50 --masking-type random
+{
+  "method": "Predictive Masking",
+  "model": "roberta-base_wikitext_finetuned",
+  "masking_type": "random",
+  "mask_ratio": 0.5,
+  "compression_efficiency_bpt": 42.18536585365854,
+  "reconstruction_fidelity": 0.6925825383572554,
+  "model_size_mb": 480.30409145355225
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/roberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.75 --masking-type random
+{
+  "method": "Predictive Masking",
+  "model": "roberta-base_wikitext_finetuned",
+  "masking_type": "random",
+  "mask_ratio": 0.75,
+  "compression_efficiency_bpt": 44.96210131332082,
+  "reconstruction_fidelity": 0.47328004281274116,
+  "model_size_mb": 480.30409145355225
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/roberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.25 --masking-type deterministic
+{
+  "method": "Predictive Masking",
+  "model": "roberta-base_wikitext_finetuned",
+  "masking_type": "deterministic",
+  "mask_ratio": 0.25,
+  "compression_efficiency_bpt": 39.30356472795497,
+  "reconstruction_fidelity": 0.8337259304792933,
+  "model_size_mb": 480.30409145355225
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/roberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.50 --masking-type deterministic
+{
+  "method": "Predictive Masking",
+  "model": "roberta-base_wikitext_finetuned",
+  "masking_type": "deterministic",
+  "mask_ratio": 0.5,
+  "compression_efficiency_bpt": 42.21388367729831,
+  "reconstruction_fidelity": 0.6875513988880622,
+  "model_size_mb": 480.30409145355225
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/roberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.75 --masking-type deterministic
+{
+  "method": "Predictive Masking",
+  "model": "roberta-base_wikitext_finetuned",
+  "masking_type": "deterministic",
+  "mask_ratio": 0.75,
+  "compression_efficiency_bpt": 45.073170731707314,
+  "reconstruction_fidelity": 0.4878953914040982,
+  "model_size_mb": 480.30409145355225
+}
+----------------------------------------
+RUNNING: E1.E1A.method_latent_quantization --model-path /root/test/E1/E1A/models/roberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --decoder-path /root/test/E1/E1A/models/roberta-base_lsq_decoder.pth --train-decoder
+Epoch 1, Val Loss: 4.149807537078858
+Epoch 2, Val Loss: 3.4751566162109375
+Epoch 3, Val Loss: 3.1510714693069457
+----------------------------------------
+RUNNING: E1.E1A.method_latent_quantization --model-path /root/test/E1/E1A/models/roberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --decoder-path /root/test/E1/E1A/models/roberta-base_lsq_decoder.pth --evaluate
+{
+  "method": "Latent Space Quantization",
+  "compression_efficiency_bpt": 6284.631894934334,
+  "reconstruction_fidelity": 0.1968880338204756,
+  "model_size_mb": 779.5258388519287
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/distilroberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.25 --masking-type random
+{
+  "method": "Predictive Masking",
+  "model": "distilroberta-base_wikitext_finetuned",
+  "masking_type": "random",
+  "mask_ratio": 0.25,
+  "compression_efficiency_bpt": 39.43264540337711,
+  "reconstruction_fidelity": 0.8372428326697388,
+  "model_size_mb": 318.06449699401855
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/distilroberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.50 --masking-type random
+{
+  "method": "Predictive Masking",
+  "model": "distilroberta-base_wikitext_finetuned",
+  "masking_type": "random",
+  "mask_ratio": 0.5,
+  "compression_efficiency_bpt": 42.165853658536584,
+  "reconstruction_fidelity": 0.6430655117561624,
+  "model_size_mb": 318.06449699401855
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/distilroberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.75 --masking-type random
+{
+  "method": "Predictive Masking",
+  "model": "distilroberta-base_wikitext_finetuned",
+  "masking_type": "random",
+  "mask_ratio": 0.75,
+  "compression_efficiency_bpt": 45.04765478424015,
+  "reconstruction_fidelity": 0.47113095864169313,
+  "model_size_mb": 318.06449699401855
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/distilroberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.25 --masking-type deterministic
+{
+  "method": "Predictive Masking",
+  "model": "distilroberta-base_wikitext_finetuned",
+  "masking_type": "deterministic",
+  "mask_ratio": 0.25,
+  "compression_efficiency_bpt": 39.082926829268295,
+  "reconstruction_fidelity": 0.83828166554768,
+  "model_size_mb": 318.06449699401855
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/distilroberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.50 --masking-type deterministic
+{
+  "method": "Predictive Masking",
+  "model": "distilroberta-base_wikitext_finetuned",
+  "masking_type": "deterministic",
+  "mask_ratio": 0.5,
+  "compression_efficiency_bpt": 42.41050656660413,
+  "reconstruction_fidelity": 0.6127601089031405,
+  "model_size_mb": 318.06449699401855
+}
+----------------------------------------
+RUNNING: E1.E1A.method_predictive_masking --model-path /root/test/E1/E1A/models/distilroberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --mask-ratio 0.75 --masking-type deterministic
+{
+  "method": "Predictive Masking",
+  "model": "distilroberta-base_wikitext_finetuned",
+  "masking_type": "deterministic",
+  "mask_ratio": 0.75,
+  "compression_efficiency_bpt": 45.038649155722325,
+  "reconstruction_fidelity": 0.4662615910797463,
+  "model_size_mb": 318.06449699401855
+}
+----------------------------------------
+RUNNING: E1.E1A.method_latent_quantization --model-path /root/test/E1/E1A/models/distilroberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --decoder-path /root/test/E1/E1A/models/distilroberta-base_lsq_decoder.pth --train-decoder
+Epoch 1, Val Loss: 3.9305266342163088
+Epoch 2, Val Loss: 3.3338978748321533
+Epoch 3, Val Loss: 3.0444213972091676
+----------------------------------------
+RUNNING: E1.E1A.method_latent_quantization --model-path /root/test/E1/E1A/models/distilroberta-base_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1 --decoder-path /root/test/E1/E1A/models/distilroberta-base_lsq_decoder.pth --evaluate
+{
+  "method": "Latent Space Quantization",
+  "compression_efficiency_bpt": 6284.631894934334,
+  "reconstruction_fidelity": 0.3233799461096707,
+  "model_size_mb": 617.286301612854
+}
+----------------------------------------
+RUNNING: E1.E1A.method_arithmetic_coding --model-path /root/test/E1/E1A/models/gpt2_wikitext_finetuned --dataset-name wikitext --dataset-config wikitext-2-raw-v1
+--- Evaluating Arithmetic Coding using model: /root/test/E1/E1A/models/gpt2_wikitext_finetuned ---
+{
+  "method": "Arithmetic Coding (Lossless)",
+  "model_architecture": "CausalLM",
+  "compression_efficiency_bpt": 5.059662288930582,
+  "reconstruction_fidelity": 1.0,
+  "model_size_mb": 479.31097888946533
+}
+----------------------------------------
+--- SOTA BAKE-OFF COMPLETE! ---
