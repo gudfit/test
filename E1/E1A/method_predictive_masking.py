@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # E1/E1A/method_predictive_masking.py
 import argparse, json, torch
 from transformers import AutoTokenizer, AutoModelForMaskedLM

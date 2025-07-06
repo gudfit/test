@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # E1/E1A/bakeoff_utils.py
 import os
 import random

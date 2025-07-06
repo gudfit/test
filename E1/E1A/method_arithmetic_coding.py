@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # E1/E1A/method_arithmetic_coding.py
 import argparse
 import json
@@ -23,16 +24,13 @@ class ArithmeticEncoder:
     def encode_symbol(self, cdf_low, cdf_high):
         range_val = self.high - self.low + 1
 
-        # Use double precision for intermediate calculations
         low_fp = float(self.low)
         high_fp = float(self.high)
         range_fp = float(range_val)
 
-        # Calculate new high and low with double precision
         new_high = low_fp + math.floor(range_fp * cdf_high)
         new_low = low_fp + math.ceil(range_fp * cdf_low)
 
-        # Check for overflow before converting back to int
         if new_high > float(self.full_range - 1):
             new_high = self.full_range - 1
         if new_low < 0:

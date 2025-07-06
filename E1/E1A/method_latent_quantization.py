@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # E1/E1A/method_latent_quantization.py
 import argparse, json, torch, os
 import torch.nn as nn
