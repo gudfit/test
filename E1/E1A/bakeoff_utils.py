@@ -38,11 +38,6 @@ def calculate_reconstruction_fidelity(original_tokens, decompressed_tokens):
     return correct_count / len(aligned_original) if aligned_original else 1.0
 
 def predictive_masking_compress(text, tokenizer, mask_ratio=0.15, deterministic=False):
-    """
-    Compresses text by masking tokens.
-    NOTE: The verb-checking logic has been removed to prevent NLTK errors.
-    Both 'deterministic' and 'random' masking now use the same random token masking.
-    """
     tokens = tokenizer.tokenize(text)
     if not tokens:
         return ""
