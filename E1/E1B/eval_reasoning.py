@@ -14,19 +14,12 @@ def evaluate_zero_shot_reasoning(model_name, task_name, cache_dir):
     A true zero-shot evaluation for MLMs is more complex; this is a practical approximation.
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    
-    # For a robust reasoning test, we use a model already fine-tuned on MNLI.
-    # This evaluates the "potential" for reasoning in the base architecture.
-    # CORRECTED a widely used RoBERTa model fine-tuned on the MNLI dataset.
     reasoning_model_name = "textattack/roberta-base-MNLI" 
     
     tokenizer = AutoTokenizer.from_pretrained(reasoning_model_name, cache_dir=cache_dir)
     model = AutoModelForSequenceClassification.from_pretrained(reasoning_model_name, cache_dir=cache_dir).to(device)
     model.eval()
-
-    # Evaluate on the validation set of the specified task
     dataset = load_dataset(task_name, split="validation_mismatched", cache_dir=cache_dir)
-    # Use a small subset for a quick evaluation
     subset = dataset.select(range(200))
 
     correct_predictions = 0
@@ -37,8 +30,6 @@ def evaluate_zero_shot_reasoning(model_name, task_name, cache_dir):
             inputs = tokenizer(item['premise'], item['hypothesis'], return_tensors='pt', truncation=True, padding=True).to(device)
             outputs = model(**inputs)
             prediction = torch.argmax(outputs.logits, dim=-1).item()
-            
-            # In MNLI, the label mapping is {0: entailment, 1: neutral, 2: contradiction}
             if prediction == item['label']:
                 correct_predictions += 1
             total_predictions += 1

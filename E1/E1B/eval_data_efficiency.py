@@ -27,7 +27,7 @@ def evaluate_data_efficiency(model_name, task_name, cache_dir):
 
     eval_dataset = eval_dataset.map(tokenize_function, batched=True)
     
-    # Updated to the more granular list of sample sizes
+    
     data_subsets = [100, 200, 300, 400, 500, 600, 700, 800, 900, 950, 1000]
     
     target_accuracy = 0.85
@@ -37,7 +37,7 @@ def evaluate_data_efficiency(model_name, task_name, cache_dir):
         model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2, cache_dir=cache_dir).to(device)
         model.config.pad_token_id = tokenizer.pad_token_id
 
-        # Ensure we don't request more samples than available in the dataset
+        
         if num_samples > len(train_dataset):
             print(f"Warning: Requested {num_samples} samples, but dataset only has {len(train_dataset)}. Skipping.")
             continue

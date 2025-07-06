@@ -13,13 +13,13 @@ def calculate_perplexity(model_name, dataset_name, dataset_config, cache_dir):
     Note: This uses a CausalLM for straightforward PPL calculation.
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    # GPT-2 is a standard choice for perplexity evaluation
+    
     model = AutoModelForCausalLM.from_pretrained(model_name, cache_dir=os.path.join(cache_dir, "models")).to(device)
     tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=os.path.join(cache_dir, "models"))
     model.eval()
 
     dataset = load_dataset(dataset_name, dataset_config, split='test', cache_dir=os.path.join(cache_dir, "datasets"))
-    # Use a subset for faster evaluation
+    
     text = "\n\n".join(dataset.select(range(50))['text'])
     encodings = tokenizer(text, return_tensors='pt')
 
@@ -46,7 +46,7 @@ def calculate_perplexity(model_name, dataset_name, dataset_config, cache_dir):
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate Model Generalisation via Perplexity.")
-    # Using gpt2 as it's a causal LM, making perplexity calculation standard.
+    
     parser.add_argument("--model-name", type=str, default="gpt2", help="Hugging Face model name for PPL calculation.")
     parser.add_argument("--dataset-name", type=str, default="wikitext", help="OOD dataset name.")
     parser.add_argument("--dataset-config", type=str, default="wikitext-2-raw-v1", help="OOD dataset configuration.")

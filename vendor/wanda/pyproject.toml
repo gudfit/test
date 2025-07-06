@@ -1,0 +1,31 @@
+# vendor/wanda/pyproject.toml
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name    = "wanda"
+version = "0.0.8.20+local"
+requires-python = ">=3.10"
+dependencies = ["torch>=2.1", "transformers>=4.40"]
+
+[tool.setuptools]
+# List all the Python packages and sub-packages to be included.
+packages = [
+    "wanda",
+    "wanda.lib",
+    "wanda.dense_ft",
+    "wanda.image_classifiers",
+    "wanda.image_classifiers.models",
+    "wanda.lora_ft"
+]
+
+# This is the correct TOML syntax for the package_dir table.
+# Each key-value pair is on its own line under the table header.
+[tool.setuptools.package-dir]
+"wanda" = "."
+"wanda.lib" = "lib"
+"wanda.dense_ft" = "dense_ft"
+"wanda.image_classifiers" = "image_classifiers"
+"wanda.lora_ft" = "lora_ft"

@@ -1,4 +1,6 @@
+-e vendor/wanda
 transformers
+bitsandbytes
 torch
 spacy
 datasets

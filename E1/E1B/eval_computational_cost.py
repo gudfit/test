@@ -1,3 +1,4 @@
+# E1/E1B/eval_computational_cost.py 
 import torch
 import argparse
 import json
@@ -14,7 +15,6 @@ def analyze_computational_cost(model_name, cache_dir):
     model = AutoModel.from_pretrained(model_name, cache_dir=cache_dir).to(device)
     model.eval()
 
-    # --- Prepare a sample input dictionary ---
     sequence_length = 128
     sample_text = "This is a sample sentence to measure the computational cost."
     inputs = tokenizer(
@@ -25,34 +25,19 @@ def analyze_computational_cost(model_name, cache_dir):
         truncation=True
     )
     inputs = {k: v.to(device) for k, v in inputs.items()}
-
-    #
-    # --- THE NEW FIX ---
-    # The fvcore analyzer expects a tuple of positional arguments, not a dictionary.
-    # We manually create a tuple of the tensors in the correct order that the
-    # underlying model's 'forward' method expects (input_ids, attention_mask, etc.).
-    #
     input_tuple = (
         inputs["input_ids"],
         inputs.get("attention_mask"),
         inputs.get("token_type_ids"),
     )
-    # Filter out any None values (e.g., if token_type_ids doesn't exist)
     input_tuple = tuple(t for t in input_tuple if t is not None)
-
-    # --- 1. Measure FLOPs ---
-    # Now we pass the correctly formatted tuple to the analyzer.
     flop_analyzer = FlopCountAnalysis(model, inputs=input_tuple)
     total_flops = flop_analyzer.total()
     gflops = total_flops / 1e9
-
-    # --- 2. Measure Inference Latency ---
-    # Run warm-up inferences
     for _ in range(5):
         with torch.no_grad():
             _ = model(**inputs)
 
-    # Measure average latency
     num_runs = 50
     start_time = time.time()
     for _ in range(num_runs):

@@ -14,17 +14,11 @@ def get_surprisal_vector(text, model, tokenizer, device):
     with torch.no_grad():
         inputs = tokenizer(text, return_tensors="pt").to(device)
         outputs = model(inputs.input_ids, labels=inputs.input_ids)
-        # Shift logits and labels to align them for loss calculation
         shift_logits = outputs.logits[..., :-1, :].contiguous()
         shift_labels = inputs.input_ids[..., 1:].contiguous()
-        
         loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
         loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-        
-        # Reshape loss to match the input sequence length (minus one)
         surprisal_per_token = loss.view(shift_labels.size())
-        
-        # Convert to numpy array and return
         return surprisal_per_token.cpu().numpy().flatten()
 
 
@@ -40,7 +34,7 @@ def calculate_crease_magnitude(original_text, oracle_model_name, compression_mod
     comp_tokenizer = AutoTokenizer.from_pretrained(compression_model_name, cache_dir=os.path.join(cache_dir, "models"))
     comp_model = AutoModelForMaskedLM.from_pretrained(compression_model_name, cache_dir=os.path.join(cache_dir, "models"))
     compressed_text = predictive_masking_compress(original_text, comp_tokenizer, mask_ratio=mask_ratio)
-    reconstructed_text = decompress_text(compressed_text, comp_model, comp_tokenizer, device="cpu") # Use CPU for E1A func
+    reconstructed_text = decompress_text(compressed_text, comp_model, comp_tokenizer, device="cpu") 
     s_original = get_surprisal_vector(original_text, oracle_model, oracle_tokenizer, device)
     s_reconstructed = get_surprisal_vector(reconstructed_text, oracle_model, oracle_tokenizer, device)
     min_len = min(len(s_original), len(s_reconstructed))

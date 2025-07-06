@@ -5,7 +5,6 @@ import gzip
 def get_dir_size(path="."):
     """Calculates the total size of a directory in megabytes (MB)."""
     total = 0
-    # Check if path exists to prevent errors
     if not os.path.exists(path):
         return 0
     for entry in os.scandir(path):

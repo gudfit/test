@@ -15,7 +15,6 @@ def evaluate_factual_recall(model_path, probe_file):
     model = AutoModelForMaskedLM.from_pretrained(model_path).to(device)
     model.eval()
 
-    # Calculate model size
     model_size_mb = get_dir_size(model_path)
 
     with open(probe_file, 'r') as f:
@@ -24,7 +23,7 @@ def evaluate_factual_recall(model_path, probe_file):
     correct_predictions = 0
     with torch.no_grad():
         for probe in factual_probes:
-            # The [MASK] token is now part of the template from the probe file
+            
             template = probe["template"].replace("[MASK]", tokenizer.mask_token)
             
             inputs = tokenizer(template, return_tensors="pt").to(device)
