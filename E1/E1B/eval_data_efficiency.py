@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # E1/E1B/eval_data_efficiency.py
 import torch
 import argparse

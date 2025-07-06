@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # E1/E1B/eval_generalisation.py
 import os
 import torch

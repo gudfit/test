@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# E1/E1B/generate_probes.py
 import argparse
 from transformers import (
     AutoTokenizer,

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # E1/E1B/knowledge_quant_utils.py
 import os
 import gzip
