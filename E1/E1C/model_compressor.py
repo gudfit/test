@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# E1/E1C/model_compressor.py
 import torch
 import argparse
 import os

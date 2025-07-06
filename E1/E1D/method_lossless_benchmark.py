@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# E1/E1D/method_lossless_benchmark.py
 from __future__ import annotations
 import argparse, gzip, bz2, math, subprocess, sys
 from pathlib import Path

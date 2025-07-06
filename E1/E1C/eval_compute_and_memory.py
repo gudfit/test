@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# E1/E1C/eval_compute_and_memory.py
 import torch
 import argparse
 import json
