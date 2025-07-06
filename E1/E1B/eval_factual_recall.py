@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # E1/E1B/eval_factual_recall.py
 import torch
 import argparse

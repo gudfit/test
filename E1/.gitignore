@@ -1,9 +1,3 @@
-cache/
-training_output_bert-base-cased/
-training_output_distilroberta-base/
-training_output_roberta-base/
-models/
-
 *.pth
 *.bin
 *.safetensors
