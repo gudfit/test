@@ -1,96 +1,56 @@
 #!/bin/bash
 set -e
 
-DATASET_NAME="wikitext"
-DATASET_CONFIG="wikitext-103-v1"
-LLM_MODEL="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-DATA_FILE="wikitext-103-test.txt"
-SAFE_MODEL_NAME=$(basename "${LLM_MODEL}")
-FINE_TUNED_MODEL_PATH="E1/E1D/models/${SAFE_MODEL_NAME}_${DATASET_NAME}_finetuned"
+# --- Path Configuration ---
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+PROJECT_ROOT="${SCRIPT_DIR}/../.."
 
-echo "--- Experiment 1D: Comparative Analysis (using ${LLM_MODEL}) ---"
+# --- Main Configuration ---
+ALL_MODELS=(
+    "EleutherAI/gpt-neo-2.7B"
+    "gpt2"
+    "facebook/opt-1.3b"
+    "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    "bert-base-cased"
+    "roberta-base"
+    "distilroberta-base"
+)
+DATA_DIR="${PROJECT_ROOT}/data"
+LOCAL_FILES=("largesample.txt" "othello.txt" "sample.txt" "wikipedia.txt")
 
-echo -e "\n--- Step 1: Preparing test data and prerequisites ---"
-for cmd in gzip bzip2 zstd bc; do
-  if ! command -v $cmd &> /dev/null; then
-    echo "ERROR: Command '$cmd' not found. Please install it."
-    exit 1
-  fi
-done
+CACHE_DIR="${SCRIPT_DIR}/cache"
 
-if [ ! -f "${DATA_FILE}" ]; then
-    echo "Downloading and concatenating dataset to ${DATA_FILE}..."
-    python -c "from datasets import load_dataset; ds = load_dataset('${DATASET_NAME}', '${DATASET_CONFIG}', split='test'); f = open('${DATA_FILE}', 'w'); f.write('\n'.join(x for x in ds['text'] if x)); f.close()"
-else
-    echo "${DATA_FILE} already exists. Skipping download."
-fi
-ORIGINAL_SIZE_BYTES=$(wc -c < "${DATA_FILE}")
-echo "Test data prepared. Original size: ${ORIGINAL_SIZE_BYTES} bytes."
+export PYTHONPATH="${PYTHONPATH}:${PROJECT_ROOT}"
+export TOKENIZERS_PARALLELISM=false
 
-echo -e "\n--- Step 2: Fine-tuning ${LLM_MODEL} on ${DATASET_NAME} ---"
-echo "NOTE: Fine-tuning a 1.1B parameter model may take some time and VRAM."
-if [ ! -d "${FINE_TUNED_MODEL_PATH}" ]; then
+echo "--- Experiment 1D: LLM vs. Algorithmic Compression Benchmark ---"
+echo "====================================================================="
+
+echo -e "\nINFO: This script uses external compressors."
+echo " - 'zstd' should be installed via your system's package manager (e.g., 'apt-get install zstd')."
+
+for file in "${LOCAL_FILES[@]}"; do
+    DATASET_FILE_PATH="${DATA_DIR}/${file}"
     
-    PYTHONPATH=. python -m E1.E1A.setup_model \
-        --model-name "${LLM_MODEL}" \
-        --dataset-name "${DATASET_NAME}" \
-        --dataset-config "${DATASET_CONFIG}" \
-        --output-path "${FINE_TUNED_MODEL_PATH}"
-else
-    echo "Fine-tuned model already exists at ${FINE_TUNED_MODEL_PATH}. Skipping fine-tuning."
-fi
+    if [ ! -f "$DATASET_FILE_PATH" ]; then
+        echo "ERROR: Dataset file not found at ${DATASET_FILE_PATH}. Skipping."
+        continue
+    fi
 
-echo -e "\n--- Step 3: Benchmarking Traditional Algorithms ---"
-declare -A results
+    for model_name in "${ALL_MODELS[@]}"; do
+        echo -e "\n\n================== Benchmarking: ${file} vs. ${model_name} =================="
+        echo -e "\nStarting benchmark process... This may take a while."
+        python -c "from transformers import AutoConfig; AutoConfig.from_pretrained('${model_name}', cache_dir='${CACHE_DIR}')" > /dev/null 2>&1
+        
+        clean_model_name=$(echo "$model_name" | tr '/' '-')
+        base_model_size_bytes=$(python -c "import sys; sys.path.append('.'); from E1.E1D.method_lossless_benchmark import get_dir_size_bytes; print(get_dir_size_bytes('${CACHE_DIR}/models--${clean_model_name}'))")
 
-
-echo "Running gzip..."
-gzip -k -f -9 "${DATA_FILE}"
-COMPRESSED_SIZE_BYTES=$(wc -c < "${DATA_FILE}.gz")
-BPC=$(echo "scale=4; ($COMPRESSED_SIZE_BYTES * 8) / $ORIGINAL_SIZE_BYTES" | bc)
-results["gzip -9"]=$BPC
-echo "gzip -9: ${BPC} BPC"
-
-
-echo "Running bzip2..."
-bzip2 -k -f -9 "${DATA_FILE}"
-COMPRESSED_SIZE_BYTES=$(wc -c < "${DATA_FILE}.bz2")
-BPC=$(echo "scale=4; ($COMPRESSED_SIZE_BYTES * 8) / $ORIGINAL_SIZE_BYTES" | bc)
-results["bzip2 -9"]=$BPC
-echo "bzip2 -9: ${BPC} BPC"
-
-
-echo "Running zstd..."
-zstd -k -f -19 "${DATA_FILE}"
-COMPRESSED_SIZE_BYTES=$(wc -c < "${DATA_FILE}.zst")
-BPC=$(echo "scale=4; ($COMPRESSED_SIZE_BYTES * 8) / $ORIGINAL_SIZE_BYTES" | bc)
-results["zstd -19"]=$BPC
-echo "zstd -19: ${BPC} BPC"
-
-
-echo -e "\n--- Step 4: Benchmarking Fine-Tuned LLM (${LLM_MODEL}) ---"
-
-LLM_RESULT_LINE=$(PYTHONPATH=. python -m E1.E1D.method_lossless_benchmark \
-    --model-name "${FINE_TUNED_MODEL_PATH}" \
-    --dataset-name "${DATASET_NAME}" \
-    --dataset-config "${DATASET_CONFIG}")
-
-LLM_BPC=$(echo "$LLM_RESULT_LINE" | grep -oP '(\d+\.\d+)(?= BPC)')
-results["Fine-tuned ${SAFE_MODEL_NAME}"]=$LLM_BPC
-echo "LLM Result: ${LLM_BPC} BPC"
-
-
-echo -e "\n--- Final Results Summary (Bits Per Character) ---"
-echo "=================================================="
-printf "%-45s | %-10s\n" "Compressor" "BPC"
-echo "----------------------------------------------------------------"
-
-sorted_keys=($(
-    for k in "${!results[@]}"; do
-        echo "$k"
-    done | sort
-))
-for compressor in "${sorted_keys[@]}"; do
-  printf "%-45s | %-10s\n" "$compressor" "${results[$compressor]}"
+        python -m E1.E1D.method_lossless_benchmark \
+            --model-name "$model_name" \
+            --dataset-file "$DATASET_FILE_PATH" \
+            --cache-dir "$CACHE_DIR" \
+            --base-model-size "$base_model_size_bytes"
+    done
 done
-echo "=================================================="
+
+echo -e "\nExperiment 1D complete for all local files and models."
