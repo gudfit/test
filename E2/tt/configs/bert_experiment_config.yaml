@@ -1,0 +1,28 @@
+# Configuration for the BERT/RoBERTa Masked Restoration Experiment
+
+# --- Experiment Setup ---
+experiment_name: "bert_restoration_capacity"
+dataset_name: "wikitext"
+dataset_subset: "wikitext-2-raw-v1"
+test_split: "validation"
+output_file: "results/bert_restoration_results.csv"
+
+# --- Hardware Setup ---
+device: "cuda" # "cuda" or "cpu"
+
+# --- Budget Definitions ---
+# Lambda (Storage) Budget: Models to test
+lambda_budgets:
+  - name: "BERT-base"
+    model_id: "bert-base-uncased"
+    storage_cost_params: 109482240
+  - name: "RoBERTa-base" # RoBERTa is often a stronger baseline
+    model_id: "roberta-base"
+    storage_cost_params: 124645120
+  # - name: "BERT-large" # Can be added for a more comprehensive run
+  #   model_id: "bert-large-uncased"
+  #   storage_cost_params: 335141888
+
+# Theta (Retrieval) Budget: Percentage of UNMASKED tokens
+theta_budgets: [0.1, 0.5, 0.9] # 10%, 50%, 90% context
+theta_max: 0.9 # The max theta budget used to define the base capability set G(λ)

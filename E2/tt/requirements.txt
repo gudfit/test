@@ -1,0 +1,13 @@
+# Core ML/DL frameworks
+torch
+transformers
+datasets
+
+# Data handling and plotting
+pandas
+matplotlib
+seaborn
+
+# Configuration
+pyyaml
+tqdm  # For progress bars
