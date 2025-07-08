@@ -1,24 +1,13 @@
-# src/analysis.py
+# E2/tt/src/analysis.py
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 
 def analyze_and_plot(results_df: pd.DataFrame, performance_col: str, output_dir: str):
-    """
-    Analyzes the results DataFrame for a specific performance metric and saves plots.
-    This is a library function called by main scripts.
-    
-    Args:
-        results_df (pd.DataFrame): The dataframe from an experiment.
-        performance_col (str): The performance column to use (e.g., 'is_perfect').
-        output_dir (str): The directory to save plots into.
-    """
-    # Create a specific subdirectory for this metric's plots
     metric_output_dir = os.path.join(output_dir, performance_col)
     os.makedirs(metric_output_dir, exist_ok=True)
     
-    # Detect Experiment Type
     if 'prompt_len_theta' in results_df.columns:
         exp_type, theta_col, theta_label = 'GPT', 'prompt_len_theta', 'Prompt Length (Tokens)'
     elif 'unmasked_ratio_theta' in results_df.columns:
@@ -28,14 +17,12 @@ def analyze_and_plot(results_df: pd.DataFrame, performance_col: str, output_dir:
         
     print(f"\n--- Analyzing {exp_type} results using metric: '{performance_col}' ---")
     
-    # --- Part A: Storage Degradation ---
     theta_max = results_df[theta_col].max()
     df_max_theta = results_df[results_df[theta_col] == theta_max]
     capacity = df_max_theta.groupby('model_name')[performance_col].sum().reset_index()
     print(f"Capacity Score (|C(λ, θ_max)|) based on '{performance_col}':")
     print(capacity)
     
-    # Plotting code remains the same...
     plt.figure(figsize=(10, 6))
     sns.barplot(data=capacity, x='model_name', y=performance_col)
     plt.title(f'Performance ({performance_col}) vs. Model (Storage Budget λ)')
@@ -44,14 +31,12 @@ def analyze_and_plot(results_df: pd.DataFrame, performance_col: str, output_dir:
     plt.savefig(plot_path)
     plt.close()
 
-    # --- Part B: Retrieval Degradation ---
     target_model_name = results_df['model_name'].iloc[0]
     df_target_model = results_df[results_df['model_name'] == target_model_name]
     retrieval_performance = df_target_model.groupby(theta_col)[performance_col].sum().reset_index()
     print(f"\nRetrieval Performance for {target_model_name} based on '{performance_col}':")
     print(retrieval_performance)
     
-    # Plotting code remains the same...
     plt.figure(figsize=(10, 6))
     sns.lineplot(data=retrieval_performance, x=theta_col, y=performance_col, marker='o')
     plt.title(f'Performance ({performance_col}) vs. Retrieval Budget θ for {target_model_name}')
@@ -60,7 +45,6 @@ def analyze_and_plot(results_df: pd.DataFrame, performance_col: str, output_dir:
     plt.savefig(plot_path)
     plt.close()
 
-    # --- Part C: Performance vs. Retrieval Cost ---
     cost_performance = results_df.groupby(['model_name', theta_col]).agg(
         performance=(performance_col, 'sum'),
         avg_retrieval_cost_ms=('retrieval_cost_ms', 'mean')
@@ -68,7 +52,6 @@ def analyze_and_plot(results_df: pd.DataFrame, performance_col: str, output_dir:
     print(f"\nCost vs. Performance Summary based on '{performance_col}':")
     print(cost_performance)
 
-    # Plotting code remains the same...
     plt.figure(figsize=(12, 8))
     sns.scatterplot(data=cost_performance, x='avg_retrieval_cost_ms', y='performance', hue='model_name', style=theta_col, s=150)
     plt.title(f'Performance ({performance_col}) vs. Retrieval Cost (Latency)')
