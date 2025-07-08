@@ -1,0 +1,22 @@
+experiment_name: "gpt2_medium_pruning_capacity"
+base_model_id: "gpt2-medium" 
+dataset_name: "wikitext"
+dataset_subset: "wikitext-2-raw-v1"
+test_split: "validation"
+output_file: "results/pruning_semantic_results.csv"
+
+device: "cuda"
+
+lambda_budgets:
+  - name: "GPT2-medium (0% pruned)"
+    path: "models/pruned_gpt2_medium/pruned_0.pt"
+  - name: "GPT2-medium (20% pruned)"
+    path: "models/pruned_gpt2_medium/pruned_20.pt"
+  - name: "GPT2-medium (40% pruned)"
+    path: "models/pruned_gpt2_medium/pruned_40.pt"
+  - name: "GPT2-medium (60% pruned)"
+    path: "models/pruned_gpt2_medium/pruned_60.pt"
+  - name: "GPT2-medium (80% pruned)"
+    path: "models/pruned_gpt2_medium/pruned_80.pt"
+
+theta_budgets: [1, 5, 10]

@@ -1,3 +1,4 @@
+# E2/tt/compare_with_traditional.py
 import os
 import time
 import pandas as pd
@@ -8,7 +9,6 @@ import bz2
 from src.data_handler import get_sentences_from_dataset
 
 def benchmark_traditional_compressor(algorithm_name: str, data_bytes: bytes) -> dict:
-    # This function remains unchanged.
     if algorithm_name == 'gzip':
         compress_func = zlib.compress
         decompress_func = zlib.decompress
@@ -77,7 +77,6 @@ def print_summary(summary: dict):
 
 def main():
     """ Main function to run the full, comprehensive comparison. """
-    # --- 1. Load Corpus and Benchmark Traditional Compressors ---
     with open('configs/experiment_config.yaml', 'r') as f:
         gpt_config = yaml.safe_load(f)
     sentences = get_sentences_from_dataset(gpt_config)
@@ -85,25 +84,20 @@ def main():
     
     traditional_results = [benchmark_traditional_compressor(algo, full_corpus_bytes) for algo in ['gzip', 'bzip2']]
 
-    # --- 2. Load ALL LLM Results ---
     df_gpt = pd.read_csv('results/reconstruction_results.csv')
     df_bert = pd.read_csv('results/bert_restoration_results.csv')
     with open('configs/bert_experiment_config.yaml', 'r') as f:
         bert_config = yaml.safe_load(f)
 
-    # --- 3. Generate Summaries for ALL Models ---
     llm_summaries = []
-    # Summarize GPT models
     for model_budget in gpt_config['lambda_budgets']:
         summary = summarize_llm_results(gpt_config, df_gpt, model_budget['name'], 'prompt_len_theta')
         llm_summaries.append(summary)
         
-    # Summarize BERT models
     for model_budget in bert_config['lambda_budgets']:
         summary = summarize_llm_results(bert_config, df_bert, model_budget['name'], 'unmasked_ratio_theta')
         llm_summaries.append(summary)
 
-    # --- 4. Present The Grand Comparison Table ---
     print("\n\n" + "="*80)
     print("--- THE GRAND COMPARISON: LLMs vs. TRADITIONAL COMPRESSORS ---")
     print("="*80 + "\n")

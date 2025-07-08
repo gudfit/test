@@ -1,11 +1,10 @@
-# Configuration for the LLM Compression Experiment
 experiment_name: "gpt2_reconstruction_capacity"
 dataset_name: "wikitext"
 dataset_subset: "wikitext-2-raw-v1"
 test_split: "validation"
 output_file: "results/reconstruction_results.csv"
 
-device: "cuda" # "cuda" or "cpu"
+device: "cuda" 
 
 lambda_budgets:
   - name: "GPT2-small"
@@ -14,9 +13,6 @@ lambda_budgets:
   - name: "GPT2-medium"
     model_id: "gpt2-medium"
     storage_cost_params: 354823168
-  # - name: "BERT-base" # BERT would require a different protocol, commented out for now
-  #   model_id: "bert-base-uncased"
-  #   storage_cost_params: 109482240
 
 theta_budgets: [1, 5, 10]
 theta_max: 10 

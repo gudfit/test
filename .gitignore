@@ -6,6 +6,7 @@ E1/E1B/training_output_distilroberta-base/
 E1/E1B/training_output_roberta-base/
 E1/E1C/models/
 E1/E1C/cache/
+tmp_model/
 
 *.pth
 *.bin
